@@ -12,29 +12,29 @@ app.use(helmet());
 
 // CORS configuration
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (mobile apps, curl, etc.)
-      if (!origin) return callback(null, true);
+    cors({
+        origin: (origin, callback) => {
+            // Allow requests with no origin (mobile apps, curl, etc.)
+            if (!origin) return callback(null, true);
 
-      // Check if origin matches any allowed pattern
-      const isAllowed = config.corsOrigins.some((allowed) => {
-        if (allowed.includes('*')) {
-          // Handle wildcard patterns like https://*.canva.site
-          const pattern = allowed.replace('*', '.*');
-          return new RegExp(`^${pattern}$`).test(origin);
-        }
-        return allowed === origin;
-      });
+            // Check if origin matches any allowed pattern
+            const isAllowed = config.corsOrigins.some((allowed) => {
+                if (allowed.includes('*')) {
+                    // Handle wildcard patterns like https://*.canva.site
+                    const pattern = allowed.replace('*', '.*');
+                    return new RegExp(`^${pattern}$`).test(origin);
+                }
+                return allowed === origin;
+            });
 
-      if (isAllowed) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
+            if (isAllowed) {
+                callback(null, true);
+            } else {
+                callback(new Error('Not allowed by CORS'));
+            }
+        },
+        credentials: true,
+    })
 );
 
 // Body parsing
@@ -49,11 +49,11 @@ app.use('/api', routes);
 
 // Root endpoint
 app.get('/', (req, res) => {
-  res.json({
-    name: 'RSVP & Wishes API',
-    version: '1.0.0',
-    status: 'running',
-  });
+    res.json({
+        name: 'RSVP & Wishes API',
+        version: '1.0.0',
+        status: 'running',
+    });
 });
 
 // Error handling
