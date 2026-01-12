@@ -6,15 +6,11 @@
       {
         "name": "canva:design:content:read",
         "type": "mandatory"
-      },
-      {
-        "name": "canva:design:content:write",
-        "type": "mandatory"
       }
     ]
   },
   "intent": {
-    "data_connector": {
+    "design_editor": {
       "enrolled": true
     }
   }

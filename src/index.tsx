@@ -1,4 +1,4 @@
-import { prepareDataConnector } from "@canva/intents/data";
-import dataConnector from "./intents/data_connector";
+import { prepareDesignEditor } from "@canva/intents/design";
+import designEditor from "./intents/design_editor";
 
-prepareDataConnector(dataConnector);
+prepareDesignEditor(designEditor);
