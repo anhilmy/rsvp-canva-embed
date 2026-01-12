@@ -7,6 +7,9 @@ import { errorHandler, notFoundHandler, apiLimiter } from './middleware';
 
 const app = express();
 
+// Trust proxy - needed when behind ngrok or other reverse proxies
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 

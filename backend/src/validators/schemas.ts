@@ -5,13 +5,17 @@ export const createWebsiteSchema = z.object({
     publishId: z.string().min(1, 'Publish ID is required'),
     name: z.string().min(1, 'Name is required').max(100),
     description: z.string().max(500).optional(),
-    eventDate: z.string().datetime().optional(),
+    eventDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+        message: 'Invalid date format',
+    }).optional(),
 });
 
 export const updateWebsiteSchema = z.object({
     name: z.string().min(1).max(100).optional(),
     description: z.string().max(500).optional(),
-    eventDate: z.string().datetime().optional(),
+    eventDate: z.string().refine((val) => !isNaN(Date.parse(val)), {
+        message: 'Invalid date format',
+    }).optional(),
     isActive: z.boolean().optional(),
 });
 

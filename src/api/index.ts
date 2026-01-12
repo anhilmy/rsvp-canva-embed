@@ -124,7 +124,10 @@ export interface GuestWithRSVP extends Guest {
 // Website API
 export const websiteApi = {
     // Get all websites (admin)
-    getAll: () => adminFetch<Website[]>("/websites"),
+    getAll: async () => {
+        const result = await adminFetch<{ websites: Website[]; total: number; pages: number }>("/websites");
+        return result.websites;
+    },
 
     // Get website by ID (admin)
     getById: (id: string) => adminFetch<Website>(`/websites/${id}`),
