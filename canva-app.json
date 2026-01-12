@@ -6,15 +6,16 @@
       {
         "name": "canva:design:content:read",
         "type": "mandatory"
+      },
+      {
+        "name": "canva:design:content:write",
+        "type": "mandatory"
       }
     ]
   },
   "intent": {
-    "content_publisher": {
-      "enrolled": true,
-      "preview_ui": {
-        "enrolled": true
-      }
+    "design_editor": {
+      "enrolled": true
     }
   }
 }

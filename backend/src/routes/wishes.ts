@@ -30,8 +30,9 @@ router.get(
     validate(paginationSchema, 'query'),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const { publishId } = req.params as { publishId: string };
             const { page, limit } = req.query as unknown as { page: number; limit: number };
-            const result = await wishService.findByWebsite(req.params.publishId, page, limit);
+            const result = await wishService.findByWebsite(publishId, page, limit);
 
             // Return only public-safe data
             const publicWishes = result.wishes.map((wish) => ({
@@ -56,7 +57,8 @@ router.get(
     '/my/:code',
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const wishes = await wishService.findByGuest(req.params.code);
+            const { code } = req.params as { code: string };
+            const wishes = await wishService.findByGuest(code);
             res.json(wishes);
         } catch (error) {
             next(error);
@@ -71,8 +73,9 @@ router.get(
     validate(paginationSchema, 'query'),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const { websiteId } = req.params as { websiteId: string };
             const { page, limit } = req.query as unknown as { page: number; limit: number };
-            const result = await wishService.findAllByWebsite(req.params.websiteId, page, limit);
+            const result = await wishService.findAllByWebsite(websiteId, page, limit);
             res.json(result);
         } catch (error) {
             next(error);
@@ -84,11 +87,13 @@ router.put(
     '/:id',
     adminAuth,
     validate(updateWishSchema),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const wish = await wishService.update(req.params.id, req.body);
+            const { id } = req.params as { id: string };
+            const wish = await wishService.update(id, req.body);
             if (!wish) {
-                return res.status(404).json({ error: 'Wish not found' });
+                res.status(404).json({ error: 'Wish not found' });
+                return;
             }
             res.json(wish);
         } catch (error) {
@@ -100,11 +105,13 @@ router.put(
 router.post(
     '/:id/toggle-visibility',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const wish = await wishService.toggleVisibility(req.params.id);
+            const { id } = req.params as { id: string };
+            const wish = await wishService.toggleVisibility(id);
             if (!wish) {
-                return res.status(404).json({ error: 'Wish not found' });
+                res.status(404).json({ error: 'Wish not found' });
+                return;
             }
             res.json(wish);
         } catch (error) {
@@ -116,11 +123,13 @@ router.post(
 router.post(
     '/:id/toggle-approval',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const wish = await wishService.toggleApproval(req.params.id);
+            const { id } = req.params as { id: string };
+            const wish = await wishService.toggleApproval(id);
             if (!wish) {
-                return res.status(404).json({ error: 'Wish not found' });
+                res.status(404).json({ error: 'Wish not found' });
+                return;
             }
             res.json(wish);
         } catch (error) {
@@ -132,11 +141,13 @@ router.post(
 router.delete(
     '/:id',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const deleted = await wishService.delete(req.params.id);
+            const { id } = req.params as { id: string };
+            const deleted = await wishService.delete(id);
             if (!deleted) {
-                return res.status(404).json({ error: 'Wish not found' });
+                res.status(404).json({ error: 'Wish not found' });
+                return;
             }
             res.status(204).send();
         } catch (error) {

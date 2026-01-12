@@ -22,11 +22,13 @@ router.post(
 
 router.get(
     '/check/:code',
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const rsvp = await rsvpService.findByGuestCode(req.params.code);
+            const { code } = req.params as { code: string };
+            const rsvp = await rsvpService.findByGuestCode(code);
             if (!rsvp) {
-                return res.json({ hasRSVP: false });
+                res.json({ hasRSVP: false });
+                return;
             }
             res.json({
                 hasRSVP: true,
@@ -46,11 +48,13 @@ router.put(
     '/:code',
     submitLimiter,
     validate(updateRSVPSchema),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const rsvp = await rsvpService.update(req.params.code, req.body);
+            const { code } = req.params as { code: string };
+            const rsvp = await rsvpService.update(code, req.body);
             if (!rsvp) {
-                return res.status(404).json({ error: 'RSVP not found' });
+                res.status(404).json({ error: 'RSVP not found' });
+                return;
             }
             res.json(rsvp);
         } catch (error) {
@@ -66,8 +70,9 @@ router.get(
     validate(paginationSchema, 'query'),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const { websiteId } = req.params as { websiteId: string };
             const { page, limit } = req.query as unknown as { page: number; limit: number };
-            const result = await rsvpService.findByWebsite(req.params.websiteId, page, limit);
+            const result = await rsvpService.findByWebsite(websiteId, page, limit);
             res.json(result);
         } catch (error) {
             next(error);
@@ -81,8 +86,9 @@ router.get(
     validate(paginationSchema, 'query'),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const { websiteId } = req.params as { websiteId: string };
             const { page, limit } = req.query as unknown as { page: number; limit: number };
-            const result = await rsvpService.getGuestStatus(req.params.websiteId, page, limit);
+            const result = await rsvpService.getGuestStatus(websiteId, page, limit);
             res.json(result);
         } catch (error) {
             next(error);

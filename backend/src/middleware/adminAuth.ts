@@ -10,11 +10,12 @@ declare global {
     }
 }
 
-export function adminAuth(req: Request, res: Response, next: NextFunction) {
+export function adminAuth(req: Request, res: Response, next: NextFunction): void {
     const authHeader = req.headers.authorization;
 
     if (!authHeader) {
-        return res.status(401).json({ error: 'Authorization header required' });
+        res.status(401).json({ error: 'Authorization header required' });
+        return;
     }
 
     // Basic auth: "Basic base64(password)"
@@ -29,7 +30,8 @@ export function adminAuth(req: Request, res: Response, next: NextFunction) {
     }
 
     if (!password || password !== config.adminPassword) {
-        return res.status(401).json({ error: 'Invalid credentials' });
+        res.status(401).json({ error: 'Invalid credentials' });
+        return;
     }
 
     req.isAdmin = true;

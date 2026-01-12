@@ -38,11 +38,13 @@ router.get(
 router.get(
     '/:id',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const website = await websiteService.findById(req.params.id);
+            const { id } = req.params as { id: string };
+            const website = await websiteService.findById(id);
             if (!website) {
-                return res.status(404).json({ error: 'Website not found' });
+                res.status(404).json({ error: 'Website not found' });
+                return;
             }
             res.json(website);
         } catch (error) {
@@ -55,11 +57,13 @@ router.put(
     '/:id',
     adminAuth,
     validate(updateWebsiteSchema),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const website = await websiteService.update(req.params.id, req.body);
+            const { id } = req.params as { id: string };
+            const website = await websiteService.update(id, req.body);
             if (!website) {
-                return res.status(404).json({ error: 'Website not found' });
+                res.status(404).json({ error: 'Website not found' });
+                return;
             }
             res.json(website);
         } catch (error) {
@@ -71,11 +75,13 @@ router.put(
 router.delete(
     '/:id',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const deleted = await websiteService.delete(req.params.id);
+            const { id } = req.params as { id: string };
+            const deleted = await websiteService.delete(id);
             if (!deleted) {
-                return res.status(404).json({ error: 'Website not found' });
+                res.status(404).json({ error: 'Website not found' });
+                return;
             }
             res.status(204).send();
         } catch (error) {
@@ -89,7 +95,8 @@ router.get(
     '/validate/:publishId',
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const result = await websiteService.validateWebsite(req.params.publishId);
+            const { publishId } = req.params as { publishId: string };
+            const result = await websiteService.validateWebsite(publishId);
             res.json(result);
         } catch (error) {
             next(error);

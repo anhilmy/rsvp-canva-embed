@@ -9,13 +9,14 @@ const router = Router();
 router.post(
     '/validate',
     validate(validateGuestSchema),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { code, publishId } = req.body;
             const result = await guestService.validateGuest(code, publishId);
 
             if (!result.valid) {
-                return res.status(400).json({ valid: false, message: result.message });
+                res.status(400).json({ valid: false, message: result.message });
+                return;
             }
 
             // Return only safe guest info
@@ -39,7 +40,8 @@ router.post(
     validate(createGuestSchema),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const guest = await guestService.create(req.params.websiteId, req.body);
+            const { websiteId } = req.params as { websiteId: string };
+            const guest = await guestService.create(websiteId, req.body);
             res.status(201).json(guest);
         } catch (error) {
             next(error);
@@ -53,7 +55,8 @@ router.post(
     validate(createGuestBulkSchema),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
-            const guests = await guestService.createBulk(req.params.websiteId, req.body.guests);
+            const { websiteId } = req.params as { websiteId: string };
+            const guests = await guestService.createBulk(websiteId, req.body.guests);
             res.status(201).json({ guests, count: guests.length });
         } catch (error) {
             next(error);
@@ -67,8 +70,9 @@ router.get(
     validate(paginationSchema, 'query'),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
+            const { websiteId } = req.params as { websiteId: string };
             const { page, limit } = req.query as unknown as { page: number; limit: number };
-            const result = await guestService.findByWebsite(req.params.websiteId, page, limit);
+            const result = await guestService.findByWebsite(websiteId, page, limit);
             res.json(result);
         } catch (error) {
             next(error);
@@ -79,11 +83,13 @@ router.get(
 router.get(
     '/:id',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const guest = await guestService.findById(req.params.id);
+            const { id } = req.params as { id: string };
+            const guest = await guestService.findById(id);
             if (!guest) {
-                return res.status(404).json({ error: 'Guest not found' });
+                res.status(404).json({ error: 'Guest not found' });
+                return;
             }
             res.json(guest);
         } catch (error) {
@@ -96,11 +102,13 @@ router.put(
     '/:id',
     adminAuth,
     validate(createGuestSchema),
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const guest = await guestService.update(req.params.id, req.body);
+            const { id } = req.params as { id: string };
+            const guest = await guestService.update(id, req.body);
             if (!guest) {
-                return res.status(404).json({ error: 'Guest not found' });
+                res.status(404).json({ error: 'Guest not found' });
+                return;
             }
             res.json(guest);
         } catch (error) {
@@ -112,11 +120,13 @@ router.put(
 router.delete(
     '/:id',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const deleted = await guestService.delete(req.params.id);
+            const { id } = req.params as { id: string };
+            const deleted = await guestService.delete(id);
             if (!deleted) {
-                return res.status(404).json({ error: 'Guest not found' });
+                res.status(404).json({ error: 'Guest not found' });
+                return;
             }
             res.status(204).send();
         } catch (error) {
@@ -128,13 +138,15 @@ router.delete(
 router.get(
     '/:id/shareable-link',
     adminAuth,
-    async (req: Request, res: Response, next: NextFunction) => {
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
+            const { id } = req.params as { id: string };
             const baseUrl = req.query.baseUrl as string;
             if (!baseUrl) {
-                return res.status(400).json({ error: 'baseUrl query parameter required' });
+                res.status(400).json({ error: 'baseUrl query parameter required' });
+                return;
             }
-            const link = await guestService.generateShareableLink(req.params.id, baseUrl);
+            const link = await guestService.generateShareableLink(id, baseUrl);
             res.json({ link });
         } catch (error) {
             next(error);
