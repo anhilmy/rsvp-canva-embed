@@ -1,12 +1,29 @@
-// API configuration
-const API_BASE_URL = process.env.BACKEND_URL || "http://localhost:3001/api";
-const ADMIN_TOKEN = process.env.ADMIN_TOKEN || "admin123";
+// API configuration - uses webpack DefinePlugin variable or defaults
+declare const BACKEND_HOST: string | undefined;
+
+// Lazy initialized config
+let API_BASE_URL: string;
+let ADMIN_TOKEN: string;
+
+function getApiConfig() {
+    if (!API_BASE_URL) {
+        // BACKEND_HOST is injected by webpack DefinePlugin
+        const backendHost = typeof BACKEND_HOST !== "undefined" ? BACKEND_HOST : "http://localhost:3001";
+        API_BASE_URL = `${backendHost}/api`;
+    }
+    if (!ADMIN_TOKEN) {
+        // For now, use a default token - in production this should be handled securely
+        ADMIN_TOKEN = "admin123";
+    }
+    return { API_BASE_URL, ADMIN_TOKEN };
+}
 
 // Generic fetch wrapper with error handling
 async function apiFetch<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
+    const { API_BASE_URL } = getApiConfig();
     const url = `${API_BASE_URL}${endpoint}`;
     const headers: HeadersInit = {
         "Content-Type": "application/json",
@@ -33,6 +50,7 @@ function adminFetch<T>(
     endpoint: string,
     options: RequestInit = {}
 ): Promise<T> {
+    const { ADMIN_TOKEN } = getApiConfig();
     return apiFetch<T>(endpoint, {
         ...options,
         headers: {

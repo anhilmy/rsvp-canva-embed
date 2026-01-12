@@ -4,6 +4,14 @@
   "runtime": {
     "permissions": [
       {
+        "name": "canva:asset:private:read",
+        "type": "mandatory"
+      },
+      {
+        "name": "canva:asset:private:write",
+        "type": "mandatory"
+      },
+      {
         "name": "canva:design:content:read",
         "type": "mandatory"
       },
@@ -12,6 +20,12 @@
         "type": "mandatory"
       }
     ]
+  },
+  "api": {
+    "user": {
+      "version": "1.0.0",
+      "hooks": {}
+    }
   },
   "intent": {
     "design_editor": {
