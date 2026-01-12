@@ -5,7 +5,6 @@ import {
   Title,
   Button,
   Alert,
-  LoadingIndicator,
   Box,
   MultilineInput,
 } from "@canva/app-ui-kit";
@@ -62,9 +61,9 @@ export const WishForm = ({ guest, websiteId, onSubmitted }: WishFormProps) => {
 
   if (success) {
     return (
-      <Box padding="2u" background="positive" borderRadius="large">
+      <Box padding="2u" background="neutralLow" borderRadius="large">
         <Rows spacing="1u">
-          <Title size="small">Thank you!</Title>
+          <Title size="small">✨ Thank you!</Title>
           <Text>Your wish has been submitted.</Text>
         </Rows>
       </Box>
@@ -103,14 +102,9 @@ export const WishForm = ({ guest, websiteId, onSubmitted }: WishFormProps) => {
         onClick={handleSubmit}
         disabled={loading || !wishMessage.trim()}
         stretch
+        loading={loading}
       >
-        {loading ? (
-          <Box padding="0.5u">
-            <LoadingIndicator size="small" />
-          </Box>
-        ) : (
-          "Send Wish"
-        )}
+        Send Wish
       </Button>
     </Rows>
   );

@@ -7,6 +7,11 @@ A Canva app that allows users to:
 - Display all wishes on the published website
 - Track RSVP status of registered guests
 
+**Architecture:**
+- **Canva App (Design Editor)**: Guest-facing RSVP form embedded in Canva websites
+- **Admin Dashboard**: Separate standalone web app for event management
+- **Backend API**: Express.js + MongoDB for data persistence
+
 ---
 
 ## Phase 1: Project Setup & Architecture
@@ -25,9 +30,9 @@ A Canva app that allows users to:
 - [x] Create `wishes` collection (guest wishes/messages)
 
 ### 1.3 Canva App Configuration
-- [x] Configure `canva-app.json` for content_publisher intent
+- [x] Configure `canva-app.json` for design_editor intent
 - [x] Set up API client for backend communication
-- [x] Update src/index.tsx with content_publisher
+- [x] Update src/index.tsx with design_editor
 
 ---
 
@@ -48,11 +53,11 @@ A Canva app that allows users to:
 ### 2.3 RSVP APIs
 - [x] `POST /api/rsvp` - Submit RSVP (with rate limiting)
 - [x] `GET /api/rsvp/website/:id` - Get all RSVPs for website
-- [x] `GET /api/rsvp/website/:id/status` - Get RSVP summary (submitted vs pending)
+- [x] `GET /api/rsvp/website/:id/stats` - Get RSVP summary stats
 
 ### 2.4 Wishes APIs
 - [x] `POST /api/wishes` - Submit a wish (with rate limiting)
-- [x] `GET /api/wishes/website/:id` - Get public wishes for website
+- [x] `GET /api/wishes/website/:id/public` - Get public wishes for website
 - [x] `GET /api/wishes/website/:id/all` - Get all wishes (admin)
 - [x] `PUT /api/wishes/:id/report` - Report a wish
 - [x] `PUT /api/wishes/:id/hide` - Hide a wish (admin)
@@ -65,46 +70,38 @@ A Canva app that allows users to:
 
 ---
 
-## Phase 3: Canva App Frontend Development
+## Phase 3: Frontend Development
 
-### 3.1 App Structure
-- [x] Set up Content Publisher intent (for publish web)
-- [x] Set up Design Editor intent (for admin)
-- [ ] Create AppContext for state management
-- [ ] Set up routing structure
-
-### 3.2 Admin/Host Views (Design Editor Intent)
-- [x] Website registration page (Setup tab)
-- [x] Guest management page (add/edit/remove guests)
-- [x] Bulk guest import (CSV format)
-- [x] RSVP dashboard (view all responses)
-- [x] Wishes moderation page (hide/unhide/report)
-
-### 3.3 Guest Views (Published Web)
-- [x] Guest validation page (enter invite code)
+### 3.1 Canva App (Guest View - Design Editor Intent)
+- [x] Event code entry page
+- [x] Guest validation component (invite code)
 - [x] RSVP submission form (Yes/No/Maybe)
 - [x] Wishes submission form
-- [x] All wishes display page
-- [x] RSVP status overview page
-
-### 3.4 UI Components
-- [x] Guest validation component
-- [x] RSVP form component
-- [x] Wishes form component
-- [x] Wishes display/card component
-- [x] Status indicator component
-- [x] Admin tabs (Setup, Guests, RSVP, Wishes)
+- [x] Wishes display list
+- [x] RSVP stats summary
 - [x] Loading/error states
 
----
+### 3.2 Admin Dashboard (Standalone Web App)
+- [x] Set up Vite + React + TypeScript
+- [x] Set up TailwindCSS for styling
+- [x] Set up React Router for navigation
+- [x] Set up React Query for data fetching
+- [x] Login page (website ID + API key)
+- [x] Registration page (create new event)
+- [x] Dashboard with stats overview
+- [x] Guests management page
+- [x] RSVPs list page
+- [x] Wishes moderation page
+- [x] Settings page
 
 ## Phase 4: Integration & Testing
 
 ### 4.1 API Integration
-- [ ] Connect frontend to backend APIs
-- [ ] Handle authentication flow
-- [ ] Implement error handling
-- [ ] Add loading states
+- [x] Connect Canva app to backend APIs
+- [x] Connect admin dashboard to backend APIs
+- [x] Handle authentication flow
+- [x] Implement error handling
+- [x] Add loading states
 
 ### 4.2 Testing
 - [ ] Write unit tests for API endpoints
@@ -117,18 +114,23 @@ A Canva app that allows users to:
 ## Phase 5: Deployment & Launch
 
 ### 5.1 Backend Deployment
-- [ ] Choose hosting provider (see DECISIONS.md)
-- [ ] Deploy backend server
-- [ ] Set up database in production
-- [ ] Configure environment variables
+- [ ] Deploy backend server to VPS
+- [ ] Set up MongoDB in production
+- [ ] Configure Docker + nginx
+- [ ] Set up SSL certificate
 
-### 5.2 Canva App Submission
+### 5.2 Admin Dashboard Deployment
+- [ ] Build admin app (`cd admin-app && npm run build`)
+- [ ] Deploy to VPS or static hosting
+- [ ] Configure nginx for admin subdomain
+
+### 5.3 Canva App Submission
 - [ ] Run production build (`npm run build`)
 - [ ] Test in Canva preview mode
 - [ ] Submit to Canva for review
 - [ ] Address any review feedback
 
-### 5.3 Post-Launch
+### 5.4 Post-Launch
 - [ ] Monitor for errors
 - [ ] Gather user feedback
 - [ ] Plan for improvements
@@ -141,25 +143,57 @@ A Canva app that allows users to:
 **Status:** Ready for Testing  
 **Last Updated:** 2026-01-12
 
+### Architecture:
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    Your VPS (Docker)                            │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────────────────┐ │
+│  │   Backend   │  │  MongoDB    │  │    nginx (reverse       │ │
+│  │  (port 3001)│  │  (port 27017)│  │    proxy + SSL)        │ │
+│  └─────────────┘  └─────────────┘  └─────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────┘
+          │                                      │
+          │                                      │
+   ┌──────▼───────┐                     ┌───────▼───────┐
+   │ Canva App    │                     │ Admin Dashboard│
+   │ (Guest RSVP) │                     │ (Management)   │
+   │ Design Editor│                     │ Vite/React     │
+   └──────────────┘                     └────────────────┘
+```
+
 ### Completed:
 - ✅ Backend server with Express.js + MongoDB
-- ✅ All API endpoints implemented (websites, guests, RSVPs, wishes)
+- ✅ All API endpoints (websites, guests, RSVPs, wishes)
 - ✅ Docker + nginx configuration
-- ✅ Content Publisher intent (guest view)
-- ✅ Design Editor intent (admin view)
-- ✅ Guest validation, RSVP, and wishes components
-- ✅ Admin dashboard with tabs (Setup, Guests, RSVPs, Wishes)
-- ✅ Bulk guest import
-- ✅ Wish moderation (hide/unhide/report)
-- ✅ Backend README with deployment instructions
+- ✅ Canva App - Design Editor intent (guest-facing RSVP form)
+- ✅ Admin Dashboard - Standalone web app (React + Vite + TailwindCSS)
+- ✅ API clients for both frontends
 
 ### Next Steps:
-1. Install backend dependencies: `cd backend && npm install`
-2. Start MongoDB: `docker run -d -p 27017:27017 mongo:7`
-3. Configure `.env` from `.env.example`
-4. Start backend: `cd backend && npm run dev`
-5. Start frontend: `npm start`
-6. Test in Canva preview
+1. **Backend Setup:**
+   ```bash
+   cd backend && npm install
+   docker-compose up -d  # MongoDB + app
+   ```
+
+2. **Admin Dashboard Setup:**
+   ```bash
+   cd admin-app && npm install
+   npm run dev  # Runs on http://localhost:3000
+   ```
+
+3. **Canva App Setup:**
+   ```bash
+   npm install
+   npm start  # Runs on http://localhost:8080
+   ```
+
+4. **Testing Flow:**
+   - Create event in admin dashboard → get Website ID + API Key
+   - Add guests → get invite codes
+   - Preview Canva app → enter Website ID
+   - Enter invite code → submit RSVP → send wish
+   - View responses in admin dashboard
 
 ---
 
@@ -167,4 +201,5 @@ A Canva app that allows users to:
 
 - Backend server required for data persistence
 - Rate limiting: 1 RSVP per guest, 1 wish per guest per hour (configurable)
-- Guest validation can be by name matching or unique invite code
+- Guest validation via unique 8-character invite code
+- RSVP options: Attending / Not Attending / Maybe

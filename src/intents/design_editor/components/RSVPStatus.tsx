@@ -62,33 +62,27 @@ export const RSVPStatus = ({ websiteId }: RSVPStatusProps) => {
 
         <Columns spacing="2u">
           <Column>
-            <Box padding="1u" background="positive" borderRadius="standard">
+            <Box padding="1u" background="neutralLow" borderRadius="standard">
               <Rows spacing="0.5u" align="center">
-                <Text size="xlarge" weight="bold">
-                  {stats.attending}
-                </Text>
+                <Title size="small">✓ {stats.attending}</Title>
                 <Text size="xsmall">Attending</Text>
               </Rows>
             </Box>
           </Column>
 
           <Column>
-            <Box padding="1u" background="warn" borderRadius="standard">
+            <Box padding="1u" background="neutralLow" borderRadius="standard">
               <Rows spacing="0.5u" align="center">
-                <Text size="xlarge" weight="bold">
-                  {stats.maybe}
-                </Text>
+                <Title size="small">? {stats.maybe}</Title>
                 <Text size="xsmall">Maybe</Text>
               </Rows>
             </Box>
           </Column>
 
           <Column>
-            <Box padding="1u" background="critical" borderRadius="standard">
+            <Box padding="1u" background="neutralLow" borderRadius="standard">
               <Rows spacing="0.5u" align="center">
-                <Text size="xlarge" weight="bold">
-                  {stats.notAttending}
-                </Text>
+                <Title size="small">✗ {stats.notAttending}</Title>
                 <Text size="xsmall">Declined</Text>
               </Rows>
             </Box>

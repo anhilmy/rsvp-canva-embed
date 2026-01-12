@@ -1,13 +1,11 @@
 import { useState } from "react";
 import {
-  Box,
   Rows,
   Text,
   Title,
   TextInput,
   Button,
   Alert,
-  LoadingIndicator,
 } from "@canva/app-ui-kit";
 import { api } from "../../../api/rsvp-client";
 
@@ -96,14 +94,9 @@ export const GuestValidation = ({
         onClick={handleValidate}
         disabled={loading || !inviteCode.trim()}
         stretch
+        loading={loading}
       >
-        {loading ? (
-          <Box padding="0.5u">
-            <LoadingIndicator size="small" />
-          </Box>
-        ) : (
-          "Validate & Continue"
-        )}
+        Validate & Continue
       </Button>
     </Rows>
   );

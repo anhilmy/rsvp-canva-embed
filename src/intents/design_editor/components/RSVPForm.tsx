@@ -5,8 +5,6 @@ import {
   Title,
   Button,
   Alert,
-  LoadingIndicator,
-  Box,
   SegmentedControl,
   TextInput,
 } from "@canva/app-ui-kit";
@@ -120,14 +118,9 @@ export const RSVPForm = ({ guest, websiteId, onSubmitted }: RSVPFormProps) => {
         onClick={handleSubmit}
         disabled={loading}
         stretch
+        loading={loading}
       >
-        {loading ? (
-          <Box padding="0.5u">
-            <LoadingIndicator size="small" />
-          </Box>
-        ) : (
-          "Submit RSVP"
-        )}
+        Submit RSVP
       </Button>
     </Rows>
   );

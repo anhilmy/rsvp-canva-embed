@@ -101,7 +101,7 @@ export const App = () => {
     return (
       <Box padding="3u">
         <Rows spacing="2u" align="center">
-          <LoadingIndicator size="large" />
+          <LoadingIndicator size="medium" />
           <Text>Loading event...</Text>
         </Rows>
       </Box>
@@ -161,9 +161,9 @@ export const App = () => {
 
         {view === "success" && websiteId && (
           <>
-            <Box padding="2u" background="positive" borderRadius="large">
+            <Box padding="2u" background="neutralLow" borderRadius="large">
               <Rows spacing="1u">
-                <Title size="small">Thank you!</Title>
+                <Title size="small">🎉 Thank you!</Title>
                 <Text>Your wish has been submitted successfully.</Text>
               </Rows>
             </Box>
@@ -180,8 +180,4 @@ export const App = () => {
       </Rows>
     </Box>
   );
-};
-            </Rows>
-        </Box>
-    );
 };
