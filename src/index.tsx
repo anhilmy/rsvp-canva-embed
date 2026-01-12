@@ -1,4 +1,4 @@
-import { prepareDataConnector } from "@canva/intents/data";
-import dataConnector from "./intents/data_connector";
+import { prepareContentPublisher } from "@canva/intents/content";
+import contentPublisher from "./intents/content_publisher";
 
-prepareDataConnector(dataConnector);
+prepareContentPublisher(contentPublisher);
