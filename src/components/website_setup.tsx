@@ -14,6 +14,7 @@ import {
 } from "@canva/app-ui-kit";
 import { useIntl } from "react-intl";
 import { useAppContext } from "../context";
+import { EmbedCodeGenerator } from "./embed_code_generator";
 
 export function WebsiteSetup() {
     const intl = useIntl();
@@ -289,6 +290,9 @@ export function WebsiteSetup() {
                                                     description: "Delete website button",
                                                 })}
                                             </Button>
+
+                                            {/* Embed Code Generator */}
+                                            <EmbedCodeGenerator website={currentWebsite} />
                                         </>
                                     )}
                                 </Rows>

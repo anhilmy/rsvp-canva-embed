@@ -10,10 +10,19 @@ const app = express();
 // Trust proxy - needed when behind ngrok or other reverse proxies
 app.set('trust proxy', 1);
 
-// Security middleware
-app.use(helmet());
+// Security middleware - allow embedding for embed routes
+app.use(
+    helmet({
+        contentSecurityPolicy: false, // Allow embedding
+        crossOriginEmbedderPolicy: false,
+        crossOriginResourcePolicy: { policy: 'cross-origin' },
+    })
+);
 
-// CORS configuration
+// CORS for embed routes - allow all origins (for iframe embedding)
+app.use('/api/embed', cors({ origin: true, credentials: false }));
+
+// CORS configuration for other routes
 app.use(
     cors({
         origin: (origin, callback) => {
