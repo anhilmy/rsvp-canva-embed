@@ -8,6 +8,197 @@ const router = Router();
 // Default max attendees for manual (walk-in) guests
 const MANUAL_GUEST_MAX_ATTENDEES = 2;
 
+// Simple HTML form styles (shared)
+const SIMPLE_FORM_STYLES = `
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; background: transparent; padding: 16px; }
+    .container { max-width: 400px; margin: 0 auto; }
+    h2 { font-size: 24px; text-align: center; margin-bottom: 8px; }
+    .subtitle { font-size: 14px; color: #666; text-align: center; margin-bottom: 24px; }
+    .form-group { margin-bottom: 16px; }
+    label { display: block; font-size: 14px; font-weight: 500; margin-bottom: 6px; }
+    input, select, textarea { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-size: 16px; }
+    textarea { min-height: 80px; resize: vertical; }
+    .btn { width: 100%; padding: 14px; background: linear-gradient(135deg, #8b5cf6, #7c3aed); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: 600; cursor: pointer; }
+    .btn:hover { opacity: 0.9; }
+    .message { padding: 16px; border-radius: 8px; text-align: center; margin-bottom: 16px; }
+    .success { background: #d1fae5; color: #065f46; }
+    .error { background: #fee2e2; color: #991b1b; }
+    .back-link { display: block; text-align: center; margin-top: 16px; color: #8b5cf6; text-decoration: none; }
+`;
+
+// Simple RSVP form - no JavaScript
+router.get(
+    '/simple/:publishId',
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { publishId } = req.params;
+            const { code, name, success, error } = req.query;
+
+            const website = await websiteService.findByPublishId(publishId);
+            if (!website || !website.isActive) {
+                res.status(404).send('<html><body><p>Form not available</p></body></html>');
+                return;
+            }
+
+            // Check if guest code provided
+            let guestName = (name as string) || '';
+            let maxAttendees = MANUAL_GUEST_MAX_ATTENDEES;
+            let welcomeMsg = '';
+
+            if (code) {
+                const validation = await guestService.validateGuest(code as string, publishId);
+                if (validation.valid && validation.guest) {
+                    guestName = validation.guest.name;
+                    maxAttendees = validation.guest.maxAttendees;
+                    welcomeMsg = `<p style="color:#8b5cf6;text-align:center;margin-bottom:16px;font-weight:500;">Welcome, ${guestName}! 🎉</p>`;
+                }
+            }
+
+            // Build attendee options
+            let attendeeOptions = '';
+            for (let i = 1; i <= maxAttendees; i++) {
+                attendeeOptions += `<option value="${i}">${i}</option>`;
+            }
+
+            // Status messages
+            let statusHtml = '';
+            if (success === '1') {
+                statusHtml = '<div class="message success">Thank you for your RSVP! 🎉</div>';
+            } else if (error) {
+                statusHtml = `<div class="message error">${error}</div>`;
+            }
+
+            const html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RSVP - ${website.name}</title>
+    <style>${SIMPLE_FORM_STYLES}</style>
+</head>
+<body>
+    <div class="container">
+        <h2>RSVP</h2>
+        <p class="subtitle">${website.name}${website.eventDate ? ' • ' + new Date(website.eventDate).toLocaleDateString() : ''}</p>
+        
+        ${welcomeMsg}
+        ${statusHtml}
+        
+        <form method="POST" action="">
+            <input type="hidden" name="guestCode" value="${code || ''}">
+            
+            <div class="form-group">
+                <label for="name">Your Name *</label>
+                <input type="text" id="name" name="name" required value="${guestName}" ${code ? 'readonly' : ''} placeholder="Enter your name">
+            </div>
+            
+            <div class="form-group">
+                <label for="attendeeCount">Number of Guests</label>
+                <select id="attendeeCount" name="attendeeCount">
+                    ${attendeeOptions}
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="status">Will you attend?</label>
+                <select id="status" name="status">
+                    <option value="attending">Yes, I'll be there!</option>
+                    <option value="maybe">Maybe</option>
+                    <option value="not_attending">Sorry, can't make it</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="message">Leave a Wish (Optional)</label>
+                <textarea id="message" name="message" placeholder="Write your wishes..."></textarea>
+            </div>
+            
+            <button type="submit" class="btn">Submit RSVP</button>
+        </form>
+    </div>
+</body>
+</html>`;
+
+            res.setHeader('Content-Type', 'text/html');
+            res.send(html);
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Handle simple form POST submission
+router.post(
+    '/simple/:publishId',
+    submitLimiter,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { publishId } = req.params;
+            const { name, guestCode, attendeeCount, status, message } = req.body;
+
+            const website = await websiteService.findByPublishId(publishId);
+            if (!website || !website.isActive) {
+                res.redirect(`/f/simple/${publishId}?error=Website+not+found`);
+                return;
+            }
+
+            let guest;
+            let effectiveMaxAttendees = MANUAL_GUEST_MAX_ATTENDEES;
+
+            if (guestCode) {
+                const validation = await guestService.validateGuest(guestCode, publishId);
+                if (validation.valid && validation.guest) {
+                    guest = validation.guest;
+                    effectiveMaxAttendees = guest.maxAttendees;
+                } else {
+                    res.redirect(`/f/simple/${publishId}?error=Invalid+guest+code`);
+                    return;
+                }
+            } else {
+                if (!name || name.trim() === '') {
+                    res.redirect(`/f/simple/${publishId}?error=Name+is+required`);
+                    return;
+                }
+                guest = await guestService.create(website._id.toString(), {
+                    name: name.trim(),
+                    maxAttendees: MANUAL_GUEST_MAX_ATTENDEES,
+                }, true);
+            }
+
+            const finalAttendeeCount = Math.min(parseInt(attendeeCount) || 1, effectiveMaxAttendees);
+
+            await rsvpService.create({
+                guestCode: guest.uniqueCode,
+                publishId,
+                status: status || 'attending',
+                attendeeCount: finalAttendeeCount,
+            });
+
+            if (message && message.trim()) {
+                try {
+                    await wishService.create({
+                        guestCode: guest.uniqueCode,
+                        publishId,
+                        message: message.trim(),
+                    });
+                } catch (e) {
+                    console.error('Failed to create wish:', e);
+                }
+            }
+
+            // Redirect back with success
+            const redirectUrl = guestCode
+                ? `/f/simple/${publishId}?code=${guestCode}&success=1`
+                : `/f/simple/${publishId}?success=1`;
+            res.redirect(redirectUrl);
+        } catch (error) {
+            console.error('Simple form error:', error);
+            res.redirect(`/f/simple/${req.params.publishId}?error=Something+went+wrong`);
+        }
+    }
+);
+
 // Schema for open RSVP submission (public form - can be with or without guest code)
 const openRSVPSchema = z.object({
     publishId: z.string().min(1, 'Publish ID is required'),
