@@ -25,11 +25,16 @@ FROM nginx:alpine
 # Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Copy nginx config for SPA routing
+# Create proper nginx config with MIME types and SPA routing
 RUN echo 'server { \
     listen 80; \
     root /usr/share/nginx/html; \
     index index.html; \
+    \
+    # Include default MIME types \
+    include /etc/nginx/mime.types; \
+    default_type application/octet-stream; \
+    \
     location / { \
         try_files $uri $uri/ /index.html; \
     } \

@@ -1,7 +1,6 @@
 # Production Docker Compose
 # Services: nginx, backend, admin, canva-app, mongodb
 # Run: docker compose -f docker-compose.prod.yml --env-file .env.production up -d --build
-version: '3.8'
 
 services:
   # MongoDB Database

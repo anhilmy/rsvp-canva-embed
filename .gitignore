@@ -16,3 +16,4 @@ mongodb_data
 
 # SSL certificates
 nginx/ssl/*.pem
+.env.prod

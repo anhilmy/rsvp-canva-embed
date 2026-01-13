@@ -6,8 +6,8 @@ WORKDIR /app
 # Copy package files
 COPY package*.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (skip postinstall script for Docker)
+RUN npm ci --ignore-scripts
 
 # Copy source files
 COPY . .
@@ -25,13 +25,28 @@ FROM nginx:alpine
 # Copy built files
 COPY --from=builder /app/dist /usr/share/nginx/html
 
-# Simple nginx config for static files
+# Create proper nginx config with MIME types
 RUN echo 'server { \
     listen 80; \
     root /usr/share/nginx/html; \
     index index.html; \
+    \
+    # Proper MIME types for JS modules \
+    types { \
+        text/html html; \
+        text/css css; \
+        application/javascript js mjs; \
+        application/json json; \
+    } \
+    \
     location / { \
         try_files $uri $uri/ /index.html; \
+    } \
+    \
+    # Cache static assets \
+    location ~* \\.(?:css|js|mjs|json|woff2?|ttf|eot|svg|png|jpg|jpeg|gif|ico)$ { \
+        expires 1y; \
+        add_header Cache-Control "public, immutable"; \
     } \
 }' > /etc/nginx/conf.d/default.conf
 
