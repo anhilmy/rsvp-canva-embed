@@ -1,7 +1,0 @@
-# SSL certificates will be placed here
-# Use Let's Encrypt certbot to generate:
-# certbot certonly --standalone -d your-domain.com
-
-# Files expected:
-# - fullchain.pem
-# - privkey.pem

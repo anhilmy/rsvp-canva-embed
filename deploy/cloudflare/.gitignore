@@ -1,8 +1,0 @@
-# Secrets - never commit
-.env
-
-# Backups
-backups/
-
-# Docker volumes (if local)
-mongodb_data/
