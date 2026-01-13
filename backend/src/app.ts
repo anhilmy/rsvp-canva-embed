@@ -73,6 +73,18 @@ app.use('/api', routes);
 // Embed routes (without /api prefix for direct iframe embedding)
 app.use('/embed', embedRoutes);
 
+// Plain form route - NO security headers at all for Canva embedding
+app.use('/f', (req, res, next) => {
+    // Remove ALL security headers
+    res.removeHeader('X-Frame-Options');
+    res.removeHeader('X-Content-Type-Options');
+    res.removeHeader('Content-Security-Policy');
+    res.removeHeader('X-XSS-Protection');
+    // Explicitly allow framing from anywhere
+    res.setHeader('X-Frame-Options', 'ALLOWALL');
+    next();
+}, embedRoutes);
+
 // Root endpoint
 app.get('/', (req, res) => {
     res.json({
