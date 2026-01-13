@@ -142,38 +142,88 @@ export class RSVPService {
 
     async getGuestStatus(websiteId: string, page: number = 1, limit: number = 50): Promise<{
         guests: Array<{
+            _id: string;
             name: string;
-            code: string;
-            hasRSVP: boolean;
-            status?: string;
-            attendeeCount?: number;
+            uniqueCode: string;
+            maxAttendees: number;
+            isManual: boolean;
+            rsvp?: {
+                status: string;
+                attendeeCount: number;
+                submittedAt: Date;
+            };
         }>;
         total: number;
         pages: number;
+        stats: {
+            total: number;
+            attending: number;
+            notAttending: number;
+            maybe: number;
+            pending: number;
+            totalAttendees: number;
+        };
     }> {
         const skip = (page - 1) * limit;
         const websiteObjectId = new Types.ObjectId(websiteId);
 
-        const [guests, total] = await Promise.all([
+        const [guests, total, statsAgg] = await Promise.all([
             Guest.find({ websiteId: websiteObjectId })
                 .sort({ name: 1 })
                 .skip(skip)
                 .limit(limit),
             Guest.countDocuments({ websiteId: websiteObjectId }),
+            RSVP.aggregate([
+                { $match: { websiteId: websiteObjectId } },
+                {
+                    $group: {
+                        _id: '$status',
+                        count: { $sum: 1 },
+                        attendees: { $sum: '$attendeeCount' },
+                    },
+                },
+            ]),
         ]);
 
         const guestIds = guests.map((g) => g._id);
         const rsvps = await RSVP.find({ guestId: { $in: guestIds } });
         const rsvpMap = new Map(rsvps.map((r) => [r.guestId.toString(), r]));
 
+        // Calculate stats
+        const totalRsvps = statsAgg.reduce((sum, s) => sum + s.count, 0);
+        const stats = {
+            total,
+            attending: 0,
+            notAttending: 0,
+            maybe: 0,
+            pending: total - totalRsvps,
+            totalAttendees: 0,
+        };
+
+        for (const stat of statsAgg) {
+            if (stat._id === 'attending') {
+                stats.attending = stat.count;
+                stats.totalAttendees = stat.attendees;
+            } else if (stat._id === 'not_attending') {
+                stats.notAttending = stat.count;
+            } else if (stat._id === 'maybe') {
+                stats.maybe = stat.count;
+            }
+        }
+
         const guestStatus = guests.map((guest) => {
             const rsvp = rsvpMap.get(guest._id.toString());
             return {
+                _id: guest._id.toString(),
                 name: guest.name,
-                code: guest.uniqueCode,
-                hasRSVP: !!rsvp,
-                status: rsvp?.status,
-                attendeeCount: rsvp?.attendeeCount,
+                uniqueCode: guest.uniqueCode,
+                maxAttendees: guest.maxAttendees,
+                isManual: guest.isManual,
+                rsvp: rsvp ? {
+                    status: rsvp.status,
+                    attendeeCount: rsvp.attendeeCount,
+                    submittedAt: rsvp.submittedAt,
+                } : undefined,
             };
         });
 
@@ -181,6 +231,7 @@ export class RSVPService {
             guests: guestStatus,
             total,
             pages: Math.ceil(total / limit),
+            stats,
         };
     }
 }

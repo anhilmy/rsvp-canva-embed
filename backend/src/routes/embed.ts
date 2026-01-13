@@ -5,10 +5,14 @@ import { validate, submitLimiter, wishLimiter } from '../middleware';
 
 const router = Router();
 
-// Schema for open RSVP submission (public form without guest code)
+// Default max attendees for manual (walk-in) guests
+const MANUAL_GUEST_MAX_ATTENDEES = 2;
+
+// Schema for open RSVP submission (public form - can be with or without guest code)
 const openRSVPSchema = z.object({
     publishId: z.string().min(1, 'Publish ID is required'),
     name: z.string().min(1, 'Name is required').max(100),
+    guestCode: z.string().optional(), // Optional: if provided, validates against existing guest
     attendeeCount: z.number().int().min(1).max(20).default(1),
     status: z.enum(['attending', 'not_attending', 'maybe']).default('attending'),
     message: z.string().max(1000).optional(), // Optional wish message
@@ -20,6 +24,30 @@ const openWishSchema = z.object({
     name: z.string().min(1, 'Name is required').max(100),
     message: z.string().min(1, 'Message is required').max(1000),
 });
+
+// Get guest info by code (for pre-filling form)
+router.get(
+    '/guest/:publishId/:code',
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { publishId, code } = req.params as { publishId: string; code: string };
+
+            const validation = await guestService.validateGuest(code, publishId);
+            if (!validation.valid || !validation.guest) {
+                res.status(404).json({ error: 'Guest not found' });
+                return;
+            }
+
+            res.json({
+                name: validation.guest.name,
+                maxAttendees: validation.guest.maxAttendees,
+                isManual: validation.guest.isManual,
+            });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
 
 // Get embed configuration for a website
 router.get(
@@ -45,14 +73,14 @@ router.get(
     }
 );
 
-// Submit open RSVP (creates guest on the fly)
+// Submit RSVP (supports both pre-created guests with code and manual walk-in guests)
 router.post(
     '/rsvp',
     submitLimiter,
     validate(openRSVPSchema),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
-            const { publishId, name, attendeeCount, status, message } = req.body;
+            const { publishId, name, guestCode, attendeeCount, status, message } = req.body;
 
             // Find website
             const website = await websiteService.findByPublishId(publishId);
@@ -61,18 +89,40 @@ router.post(
                 return;
             }
 
-            // Create a guest entry for this public submission
-            const guest = await guestService.create(website._id.toString(), {
-                name,
-                maxAttendees: attendeeCount,
-            });
+            let guest;
+            let isManualGuest = true;
+            let effectiveMaxAttendees = MANUAL_GUEST_MAX_ATTENDEES;
+
+            // Check if guest code provided - validate existing guest
+            if (guestCode) {
+                const validation = await guestService.validateGuest(guestCode, publishId);
+                if (validation.valid && validation.guest) {
+                    guest = validation.guest;
+                    isManualGuest = guest.isManual;
+                    effectiveMaxAttendees = guest.maxAttendees;
+                } else {
+                    res.status(400).json({ error: validation.message || 'Invalid guest code' });
+                    return;
+                }
+            } else {
+                // Create a manual guest entry (walk-in)
+                guest = await guestService.create(website._id.toString(), {
+                    name,
+                    maxAttendees: MANUAL_GUEST_MAX_ATTENDEES,
+                }, true); // isManual = true
+                isManualGuest = true;
+                effectiveMaxAttendees = MANUAL_GUEST_MAX_ATTENDEES;
+            }
+
+            // Validate attendee count against max allowed
+            const finalAttendeeCount = Math.min(attendeeCount, effectiveMaxAttendees);
 
             // Create RSVP
             const rsvp = await rsvpService.create({
                 guestCode: guest.uniqueCode,
                 publishId,
                 status,
-                attendeeCount,
+                attendeeCount: finalAttendeeCount,
             });
 
             // If message provided, create a wish
@@ -93,9 +143,11 @@ router.post(
 
             res.status(201).json({
                 success: true,
+                isManual: isManualGuest,
                 rsvp: {
                     status: rsvp.status,
                     attendeeCount: rsvp.attendeeCount,
+                    maxAttendees: effectiveMaxAttendees,
                 },
                 wish: wish
                     ? {
@@ -232,6 +284,13 @@ router.get(
             margin-bottom: 24px;
             text-align: center;
         }
+        .welcome-message {
+            font-size: 16px;
+            color: #8b5cf6;
+            margin-bottom: 16px;
+            text-align: center;
+            font-weight: 500;
+        }
         .form-group {
             margin-bottom: 16px;
         }
@@ -259,6 +318,10 @@ router.get(
             outline: none;
             border-color: #8b5cf6;
             box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.1);
+        }
+        input:disabled {
+            background: #f5f5f5;
+            color: #666;
         }
         textarea {
             min-height: 100px;
@@ -300,8 +363,17 @@ router.get(
             background: #fee2e2;
             color: #991b1b;
         }
+        .message.info {
+            background: #e0f2fe;
+            color: #0369a1;
+        }
         .hidden {
             display: none;
+        }
+        .max-attendees-hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
         }
     </style>
 </head>
@@ -310,9 +382,12 @@ router.get(
         <h2 class="rsvp-title">RSVP</h2>
         <p class="rsvp-subtitle">${website.name}${website.eventDate ? ' • ' + new Date(website.eventDate).toLocaleDateString() : ''}</p>
         
+        <div id="welcomeMessage" class="welcome-message hidden"></div>
         <div id="statusMessage" class="message hidden"></div>
         
         <form id="rsvpForm">
+            <input type="hidden" id="guestCode" name="guestCode" value="">
+            
             <div class="form-group">
                 <label for="name">Your Name *</label>
                 <input type="text" id="name" name="name" required placeholder="Enter your name">
@@ -320,7 +395,8 @@ router.get(
             
             <div class="form-group">
                 <label for="attendeeCount">Number of Guests</label>
-                <input type="number" id="attendeeCount" name="attendeeCount" min="1" max="20" value="1">
+                <input type="number" id="attendeeCount" name="attendeeCount" min="1" max="2" value="1">
+                <div id="maxAttendeesHint" class="max-attendees-hint">Maximum 2 guests allowed</div>
             </div>
             
             <div class="form-group">
@@ -344,12 +420,93 @@ router.get(
     <script>
         const API_URL = '${apiUrl}';
         const PUBLISH_ID = '${publishId}';
+        const DEFAULT_MAX_ATTENDEES = 2;
+        
+        let guestCode = null;
+        let maxAttendees = DEFAULT_MAX_ATTENDEES;
+        
+        // Parse URL parameters
+        function getUrlParams() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                code: params.get('code'),
+                name: params.get('name'),
+            };
+        }
+        
+        // Initialize form with URL params
+        async function initForm() {
+            const params = getUrlParams();
+            const nameInput = document.getElementById('name');
+            const attendeeCountInput = document.getElementById('attendeeCount');
+            const maxAttendeesHint = document.getElementById('maxAttendeesHint');
+            const welcomeMessage = document.getElementById('welcomeMessage');
+            const statusMessage = document.getElementById('statusMessage');
+            
+            // If guest code is provided, fetch guest info
+            if (params.code) {
+                guestCode = params.code;
+                document.getElementById('guestCode').value = params.code;
+                
+                try {
+                    const response = await fetch(API_URL + '/api/embed/guest/' + PUBLISH_ID + '/' + params.code);
+                    if (response.ok) {
+                        const guestInfo = await response.json();
+                        
+                        // Pre-fill name and make it read-only for invited guests
+                        nameInput.value = guestInfo.name;
+                        nameInput.disabled = true;
+                        
+                        // Set max attendees based on guest's allowance
+                        maxAttendees = guestInfo.maxAttendees;
+                        attendeeCountInput.max = maxAttendees;
+                        attendeeCountInput.value = 1;
+                        maxAttendeesHint.textContent = 'Maximum ' + maxAttendees + ' guest(s) allowed';
+                        
+                        // Show welcome message
+                        welcomeMessage.textContent = 'Welcome, ' + guestInfo.name + '! 🎉';
+                        welcomeMessage.classList.remove('hidden');
+                    } else {
+                        // Invalid code - show error but allow form usage
+                        statusMessage.textContent = 'Guest code not recognized. You can still RSVP as a new guest.';
+                        statusMessage.className = 'message info';
+                        guestCode = null;
+                        document.getElementById('guestCode').value = '';
+                        
+                        // Pre-fill name from URL if provided
+                        if (params.name) {
+                            nameInput.value = params.name;
+                        }
+                    }
+                } catch (err) {
+                    console.error('Error fetching guest info:', err);
+                    // Pre-fill name from URL if provided
+                    if (params.name) {
+                        nameInput.value = params.name;
+                    }
+                }
+            } else if (params.name) {
+                // Just pre-fill name from URL
+                nameInput.value = params.name;
+            }
+        }
+        
+        // Validate attendee count on change
+        document.getElementById('attendeeCount').addEventListener('change', function() {
+            const value = parseInt(this.value) || 1;
+            if (value > maxAttendees) {
+                this.value = maxAttendees;
+            } else if (value < 1) {
+                this.value = 1;
+            }
+        });
         
         document.getElementById('rsvpForm').addEventListener('submit', async (e) => {
             e.preventDefault();
             
             const btn = document.getElementById('submitBtn');
             const statusEl = document.getElementById('statusMessage');
+            const welcomeEl = document.getElementById('welcomeMessage');
             
             btn.disabled = true;
             btn.textContent = 'Submitting...';
@@ -359,7 +516,8 @@ router.get(
                 const formData = {
                     publishId: PUBLISH_ID,
                     name: document.getElementById('name').value,
-                    attendeeCount: parseInt(document.getElementById('attendeeCount').value) || 1,
+                    guestCode: guestCode || undefined,
+                    attendeeCount: Math.min(parseInt(document.getElementById('attendeeCount').value) || 1, maxAttendees),
                     status: document.getElementById('status').value,
                     message: document.getElementById('wishMessage').value || undefined,
                 };
@@ -375,6 +533,7 @@ router.get(
                 if (response.ok) {
                     statusEl.textContent = 'Thank you for your RSVP! 🎉';
                     statusEl.className = 'message success';
+                    welcomeEl.classList.add('hidden');
                     document.getElementById('rsvpForm').reset();
                 } else {
                     throw new Error(data.error || 'Failed to submit');
@@ -387,6 +546,9 @@ router.get(
                 btn.textContent = 'Submit RSVP';
             }
         });
+        
+        // Initialize form on page load
+        initForm();
     </script>
 </body>
 </html>`;

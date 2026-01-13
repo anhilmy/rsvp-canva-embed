@@ -7,6 +7,7 @@ export interface IGuest extends Document {
     phone?: string;
     uniqueCode: string;
     maxAttendees: number;
+    isManual: boolean; // True if guest was created via public form (walk-in)
     createdAt: Date;
     updatedAt: Date;
 }
@@ -39,6 +40,10 @@ const guestSchema = new Schema<IGuest>(
             type: Number,
             default: 1,
             min: 1,
+        },
+        isManual: {
+            type: Boolean,
+            default: false,
         },
     },
     {

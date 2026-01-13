@@ -7,8 +7,11 @@ import { Types } from 'mongoose';
 // Generate short, readable codes (6 characters, alphanumeric uppercase)
 const generateCode = customAlphabet('ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', 6);
 
+// Default max attendees for manual (walk-in) guests
+const MANUAL_GUEST_MAX_ATTENDEES = 2;
+
 export class GuestService {
-    async create(websiteId: string, data: CreateGuestInput): Promise<IGuest> {
+    async create(websiteId: string, data: CreateGuestInput, isManual: boolean = false): Promise<IGuest> {
         const website = await Website.findById(websiteId);
         if (!website) {
             throw createError('Website not found', 404);
@@ -35,6 +38,9 @@ export class GuestService {
             ...data,
             email: data.email || undefined,
             uniqueCode,
+            isManual,
+            // For manual guests, cap maxAttendees at MANUAL_GUEST_MAX_ATTENDEES
+            maxAttendees: isManual ? Math.min(data.maxAttendees || MANUAL_GUEST_MAX_ATTENDEES, MANUAL_GUEST_MAX_ATTENDEES) : (data.maxAttendees || 1),
         });
         await guest.save();
         return guest;
