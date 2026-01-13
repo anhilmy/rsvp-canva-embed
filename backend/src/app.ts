@@ -11,11 +11,20 @@ const app = express();
 app.set('trust proxy', 1);
 
 // Security middleware - allow embedding for embed routes
+app.use((req, res, next) => {
+    if (req.path.startsWith('/api/embed')) {
+        // Remove X-Frame-Options for embed routes to allow iframe embedding
+        res.removeHeader('X-Frame-Options');
+    }
+    next();
+});
+
 app.use(
     helmet({
         contentSecurityPolicy: false, // Allow embedding
         crossOriginEmbedderPolicy: false,
         crossOriginResourcePolicy: { policy: 'cross-origin' },
+        frameguard: false, // Disable X-Frame-Options globally, we'll handle it per route
     })
 );
 
