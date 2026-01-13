@@ -3,6 +3,7 @@ import cors from 'cors';
 import helmet from 'helmet';
 import { config } from './config';
 import routes from './routes';
+import embedRoutes from './routes/embed';
 import { errorHandler, notFoundHandler, apiLimiter } from './middleware';
 
 const app = express();
@@ -70,7 +71,7 @@ app.use('/api', apiLimiter);
 app.use('/api', routes);
 
 // Embed routes (without /api prefix for direct iframe embedding)
-app.use('/embed', require('./routes/embed').default);
+app.use('/embed', embedRoutes);
 
 // Root endpoint
 app.get('/', (req, res) => {
