@@ -12,7 +12,7 @@ app.set('trust proxy', 1);
 
 // Security middleware - allow embedding for embed routes
 app.use((req, res, next) => {
-    if (req.path.startsWith('/api/embed')) {
+    if (req.path.startsWith('/api/embed') || req.path.startsWith('/embed')) {
         // Remove X-Frame-Options for embed routes to allow iframe embedding
         res.removeHeader('X-Frame-Options');
     }
@@ -30,6 +30,7 @@ app.use(
 
 // CORS for embed routes - allow all origins (for iframe embedding)
 app.use('/api/embed', cors({ origin: true, credentials: false }));
+app.use('/embed', cors({ origin: true, credentials: false }));
 
 // CORS configuration for other routes
 app.use(
@@ -67,6 +68,9 @@ app.use('/api', apiLimiter);
 
 // API routes
 app.use('/api', routes);
+
+// Embed routes (without /api prefix for direct iframe embedding)
+app.use('/embed', require('./routes/embed').default);
 
 // Root endpoint
 app.get('/', (req, res) => {
