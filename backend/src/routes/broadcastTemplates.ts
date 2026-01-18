@@ -46,7 +46,7 @@ router.get(
         try {
             const { id } = req.params;
             const template = await broadcastTemplateService.findById(id);
-            
+
             if (!template) {
                 res.status(404).json({ error: 'Template not found' });
                 return;

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
-import { websiteApi, guestApi, rsvpApi, wishApi } from '../api';
-import type { Website, Guest, GuestWithRSVP, RSVPStats, Wish } from '../api';
+import { websiteApi, guestApi, rsvpApi, wishApi, broadcastTemplateApi, fillBroadcastTemplate } from '../api';
+import type { Website, Guest, GuestWithRSVP, RSVPStats, Wish, BroadcastTemplate } from '../api';
 
 interface WebsiteModalProps {
     website?: Website | null;
@@ -104,12 +104,132 @@ interface GuestModalProps {
     onSave: () => void;
 }
 
+interface TemplateModalProps {
+    websiteId: string;
+    template?: BroadcastTemplate | null;
+    onClose: () => void;
+    onSave: () => void;
+}
+
+function TemplateModal({ websiteId, template, onClose, onSave }: TemplateModalProps) {
+    const [form, setForm] = useState({
+        name: template?.name || '',
+        body: template?.body || '',
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    // Sample data for preview
+    const sampleGuest = {
+        name: 'John Doe',
+        greeting: 'Bapak',
+        link: 'https://example.com/rsvp?code=ABC123',
+    };
+
+    const getPreview = () => {
+        return form.body
+            .replace(/\[to\]/g, sampleGuest.name)
+            .replace(/\[greeting\]/g, sampleGuest.greeting)
+            .replace(/\[link\]/g, sampleGuest.link);
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            if (template) {
+                await broadcastTemplateApi.update(template._id, form);
+            } else {
+                await broadcastTemplateApi.create(websiteId, form);
+            }
+            onSave();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to save');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" style={{ maxWidth: '600px' }} onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3 className="modal-title">{template ? 'Edit Template' : 'Create Template'}</h3>
+                    <button className="modal-close" onClick={onClose}>×</button>
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
+                        {error && <div className="alert alert-error">{error}</div>}
+                        <div className="form-group">
+                            <label className="form-label">Template Name *</label>
+                            <input
+                                className="form-input"
+                                value={form.name}
+                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                placeholder="Wedding Invitation"
+                                required
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Message Body *</label>
+                            <textarea
+                                className="form-textarea"
+                                style={{ minHeight: '150px', fontFamily: 'monospace' }}
+                                value={form.body}
+                                onChange={(e) => setForm({ ...form, body: e.target.value })}
+                                placeholder="Kepada Yth. [greeting] [to],&#10;&#10;Kami mengundang Anda...&#10;&#10;Link RSVP: [link]"
+                                required
+                            />
+                            <p style={{ fontSize: '12px', color: '#666', marginTop: '8px' }}>
+                                <strong>Variables:</strong> [to] = Guest name, [greeting] = Honorific, [link] = RSVP link
+                            </p>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Preview</label>
+                            <div style={{
+                                background: '#f5f5f5',
+                                padding: '12px',
+                                borderRadius: '4px',
+                                whiteSpace: 'pre-wrap',
+                                fontSize: '13px',
+                                maxHeight: '150px',
+                                overflow: 'auto',
+                            }}>
+                                {getPreview() || 'Enter message body to see preview...'}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? 'Saving...' : 'Save Template'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
 function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
     const [mode, setMode] = useState<'single' | 'bulk'>('single');
-    const [form, setForm] = useState({ name: '', email: '', maxAttendees: 1 });
+    const [form, setForm] = useState({ name: '', email: '', phone: '', greeting: '', maxAttendees: 1, personalLink: '' });
     const [bulkText, setBulkText] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
+
+    const parseBulkLine = (line: string) => {
+        const parts = line.split(',').map(p => p.trim());
+        return {
+            name: parts[0],
+            email: parts[1] || undefined,
+            phone: parts[2] || undefined,
+            greeting: parts[3] || undefined,
+            maxAttendees: parts[4] ? parseInt(parts[4]) : 1,
+            personalLink: parts[5] || undefined,
+        };
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -117,13 +237,17 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
         setError('');
         try {
             if (mode === 'single') {
-                await guestApi.create(websiteId, form);
+                await guestApi.create(websiteId, {
+                    name: form.name,
+                    email: form.email || undefined,
+                    phone: form.phone || undefined,
+                    greeting: form.greeting || undefined,
+                    maxAttendees: form.maxAttendees,
+                    personalLink: form.personalLink || undefined,
+                });
             } else {
                 const lines = bulkText.split('\n').filter((l) => l.trim());
-                const guests = lines.map((line) => {
-                    const [name, email] = line.split(',').map((s) => s.trim());
-                    return { name, email: email || undefined, maxAttendees: 1 };
-                });
+                const guests = lines.map(parseBulkLine);
                 await guestApi.createBulk(websiteId, guests);
             }
             onSave();
@@ -181,6 +305,26 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                                     />
                                 </div>
                                 <div className="form-group">
+                                    <label className="form-label">Phone</label>
+                                    <input
+                                        className="form-input"
+                                        type="tel"
+                                        value={form.phone}
+                                        onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                                        placeholder="+628123456789"
+                                    />
+                                </div>
+                                <div className="form-group">
+                                    <label className="form-label">Greeting (max 16 chars)</label>
+                                    <input
+                                        className="form-input"
+                                        value={form.greeting}
+                                        onChange={(e) => setForm({ ...form, greeting: e.target.value.slice(0, 16) })}
+                                        placeholder="Bapak, Ibu, Kakak, etc."
+                                        maxLength={16}
+                                    />
+                                </div>
+                                <div className="form-group">
                                     <label className="form-label">Max Attendees</label>
                                     <input
                                         className="form-input"
@@ -191,16 +335,29 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                                         onChange={(e) => setForm({ ...form, maxAttendees: parseInt(e.target.value) || 1 })}
                                     />
                                 </div>
+                                <div className="form-group">
+                                    <label className="form-label">Personal Link (optional)</label>
+                                    <input
+                                        className="form-input"
+                                        value={form.personalLink}
+                                        onChange={(e) => setForm({ ...form, personalLink: e.target.value })}
+                                        placeholder="Custom RSVP link override"
+                                    />
+                                </div>
                             </>
                         ) : (
                             <div className="form-group">
-                                <label className="form-label">Guest List (one per line: name, email)</label>
+                                <label className="form-label">Guest List (one per line)</label>
+                                <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
+                                    Format: name, email, phone, greeting, maxAttendees, personalLink<br />
+                                    All fields after name are optional.
+                                </p>
                                 <textarea
                                     className="form-textarea"
                                     style={{ minHeight: '150px' }}
                                     value={bulkText}
                                     onChange={(e) => setBulkText(e.target.value)}
-                                    placeholder="John Doe, john@example.com&#10;Jane Smith&#10;Bob Wilson, bob@example.com"
+                                    placeholder="John Doe, john@example.com, +628123456789, Bapak, 3&#10;Jane Smith, jane@example.com&#10;Bob Wilson"
                                 />
                             </div>
                         )}
@@ -220,7 +377,7 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
 export default function Dashboard() {
     const [websites, setWebsites] = useState<Website[]>([]);
     const [selectedWebsite, setSelectedWebsite] = useState<Website | null>(null);
-    const [activeTab, setActiveTab] = useState<'guests' | 'rsvp' | 'wishes'>('guests');
+    const [activeTab, setActiveTab] = useState<'guests' | 'rsvp' | 'wishes' | 'broadcast'>('guests');
     const [guests, setGuests] = useState<Guest[]>([]);
     const [guestsWithRSVP, setGuestsWithRSVP] = useState<GuestWithRSVP[]>([]);
     const [rsvpStats, setRsvpStats] = useState<RSVPStats | null>(null);
@@ -229,6 +386,14 @@ export default function Dashboard() {
     const [showWebsiteModal, setShowWebsiteModal] = useState(false);
     const [editingWebsite, setEditingWebsite] = useState<Website | null>(null);
     const [showGuestModal, setShowGuestModal] = useState(false);
+
+    // Broadcast template state
+    const [templates, setTemplates] = useState<BroadcastTemplate[]>([]);
+    const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+    const [selectedGuestIds, setSelectedGuestIds] = useState<Set<string>>(new Set());
+    const [showTemplateModal, setShowTemplateModal] = useState(false);
+    const [editingTemplate, setEditingTemplate] = useState<BroadcastTemplate | null>(null);
+    const [exporting, setExporting] = useState(false);
 
     // Load websites
     useEffect(() => {
@@ -239,8 +404,15 @@ export default function Dashboard() {
     useEffect(() => {
         if (selectedWebsite) {
             loadTabData();
+            loadTemplates();
         }
     }, [selectedWebsite, activeTab]);
+
+    // Clear selection when website changes
+    useEffect(() => {
+        setSelectedGuestIds(new Set());
+        setSelectedTemplateId('');
+    }, [selectedWebsite]);
 
     const loadWebsites = async () => {
         try {
@@ -275,6 +447,59 @@ export default function Dashboard() {
             console.error('Failed to load data:', err);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const loadTemplates = async () => {
+        if (!selectedWebsite) return;
+        try {
+            const data = await broadcastTemplateApi.getAllByWebsite(selectedWebsite._id);
+            setTemplates(data.templates);
+        } catch (err) {
+            console.error('Failed to load templates:', err);
+        }
+    };
+
+    const getSelectedTemplate = () => {
+        return templates.find(t => t._id === selectedTemplateId);
+    };
+
+    const handleCopyBroadcast = async (guest: Guest) => {
+        if (!selectedWebsite) return;
+        const template = getSelectedTemplate();
+        if (!template) {
+            alert('Please select a template first');
+            return;
+        }
+
+        const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
+        const filledMessage = fillBroadcastTemplate(template.body, guest, backendUrl, selectedWebsite.publishId);
+
+        try {
+            await navigator.clipboard.writeText(filledMessage);
+            alert(`Broadcast message copied for ${guest.name}!`);
+        } catch (err) {
+            prompt('Copy this message:', filledMessage);
+        }
+    };
+
+    const handleToggleGuestSelection = (guestId: string) => {
+        setSelectedGuestIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(guestId)) {
+                newSet.delete(guestId);
+            } else {
+                newSet.add(guestId);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAllGuests = () => {
+        if (selectedGuestIds.size === guests.length) {
+            setSelectedGuestIds(new Set());
+        } else {
+            setSelectedGuestIds(new Set(guests.map(g => g._id)));
         }
     };
 
@@ -331,6 +556,44 @@ export default function Dashboard() {
         try {
             await wishApi.delete(id);
             loadTabData();
+        } catch (err) {
+            alert('Failed to delete');
+        }
+    };
+
+    const handleExportGuests = async () => {
+        if (!selectedWebsite || selectedGuestIds.size === 0) return;
+        setExporting(true);
+        try {
+            const blob = await guestApi.exportToExcel(
+                selectedWebsite._id,
+                Array.from(selectedGuestIds),
+                selectedTemplateId || undefined
+            );
+            // Create download link
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `guests-${selectedWebsite.publishId}-${Date.now()}.xlsx`;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        } catch (err) {
+            alert('Failed to export');
+        } finally {
+            setExporting(false);
+        }
+    };
+
+    const handleDeleteTemplate = async (id: string) => {
+        if (!confirm('Delete this template?')) return;
+        try {
+            await broadcastTemplateApi.delete(id);
+            loadTemplates();
+            if (selectedTemplateId === id) {
+                setSelectedTemplateId('');
+            }
         } catch (err) {
             alert('Failed to delete');
         }
@@ -428,6 +691,12 @@ export default function Dashboard() {
                             >
                                 Wishes
                             </button>
+                            <button
+                                className={`btn ${activeTab === 'broadcast' ? 'btn-primary' : 'btn-secondary'}`}
+                                onClick={() => setActiveTab('broadcast')}
+                            >
+                                Broadcast
+                            </button>
                         </div>
 
                         {loading ? (
@@ -438,9 +707,22 @@ export default function Dashboard() {
                                     <div className="card">
                                         <div className="card-header">
                                             <h3 className="card-title">Guests ({guests.length})</h3>
-                                            <button className="btn btn-primary" onClick={() => setShowGuestModal(true)}>
-                                                + Add Guest
-                                            </button>
+                                            <div className="flex gap-2 items-center">
+                                                <select
+                                                    className="form-input"
+                                                    style={{ width: 'auto', minWidth: '200px' }}
+                                                    value={selectedTemplateId}
+                                                    onChange={(e) => setSelectedTemplateId(e.target.value)}
+                                                >
+                                                    <option value="">Select Template...</option>
+                                                    {templates.map(t => (
+                                                        <option key={t._id} value={t._id}>{t.name}</option>
+                                                    ))}
+                                                </select>
+                                                <button className="btn btn-primary" onClick={() => setShowGuestModal(true)}>
+                                                    + Add Guest
+                                                </button>
+                                            </div>
                                         </div>
                                         {guests.length === 0 ? (
                                             <div className="empty-state">No guests yet</div>
@@ -448,17 +730,35 @@ export default function Dashboard() {
                                             <table>
                                                 <thead>
                                                     <tr>
+                                                        <th style={{ width: '40px' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedGuestIds.size === guests.length && guests.length > 0}
+                                                                onChange={handleSelectAllGuests}
+                                                            />
+                                                        </th>
                                                         <th>Name</th>
+                                                        <th>Phone</th>
+                                                        <th>Greeting</th>
                                                         <th>Type</th>
                                                         <th>Code</th>
-                                                        <th>Max Guests</th>
+                                                        <th>Max</th>
                                                         <th></th>
                                                     </tr>
                                                 </thead>
                                                 <tbody>
                                                     {guests.map((g) => (
                                                         <tr key={g._id}>
+                                                            <td>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedGuestIds.has(g._id)}
+                                                                    onChange={() => handleToggleGuestSelection(g._id)}
+                                                                />
+                                                            </td>
                                                             <td>{g.name}</td>
+                                                            <td>{g.phone || '-'}</td>
+                                                            <td>{g.greeting || '-'}</td>
                                                             <td>
                                                                 <span className={`badge ${g.isManual ? 'badge-warning' : 'badge-success'}`}>
                                                                     {g.isManual ? 'Walk-in' : 'Invited'}
@@ -474,14 +774,23 @@ export default function Dashboard() {
                                                                             onClick={() => handleShareGuest(g)}
                                                                             title="Copy shareable RSVP link"
                                                                         >
-                                                                            Share
+                                                                            📤
                                                                         </button>
                                                                     )}
                                                                     <button
+                                                                        className="btn btn-sm btn-secondary"
+                                                                        onClick={() => handleCopyBroadcast(g)}
+                                                                        title={selectedTemplateId ? 'Copy broadcast message' : 'Select a template first'}
+                                                                        disabled={!selectedTemplateId}
+                                                                    >
+                                                                        📋
+                                                                    </button>
+                                                                    <button
                                                                         className="btn btn-sm btn-danger"
                                                                         onClick={() => handleDeleteGuest(g._id)}
+                                                                        title="Delete guest"
                                                                     >
-                                                                        Delete
+                                                                        🗑️
                                                                     </button>
                                                                 </div>
                                                             </td>
@@ -489,6 +798,18 @@ export default function Dashboard() {
                                                     ))}
                                                 </tbody>
                                             </table>
+                                        )}
+                                        {selectedGuestIds.size > 0 && (
+                                            <div style={{ padding: '12px', borderTop: '1px solid #eee', background: '#f9f9f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
+                                                <span>{selectedGuestIds.size} guest(s) selected</span>
+                                                <button
+                                                    className="btn btn-primary btn-sm"
+                                                    onClick={handleExportGuests}
+                                                    disabled={exporting}
+                                                >
+                                                    {exporting ? 'Exporting...' : `📥 Export Selected (${selectedGuestIds.size})`}
+                                                </button>
+                                            </div>
                                         )}
                                     </div>
                                 )}
@@ -620,6 +941,82 @@ export default function Dashboard() {
                                         )}
                                     </div>
                                 )}
+
+                                {activeTab === 'broadcast' && (
+                                    <div className="card">
+                                        <div className="card-header">
+                                            <h3 className="card-title">Broadcast Templates ({templates.length})</h3>
+                                            <button
+                                                className="btn btn-primary"
+                                                onClick={() => {
+                                                    setEditingTemplate(null);
+                                                    setShowTemplateModal(true);
+                                                }}
+                                            >
+                                                + Create Template
+                                            </button>
+                                        </div>
+                                        {templates.length === 0 ? (
+                                            <div className="empty-state">
+                                                <p>No templates yet</p>
+                                                <p style={{ fontSize: '14px', color: '#666' }}>
+                                                    Create a broadcast template to send personalized messages to your guests.
+                                                </p>
+                                            </div>
+                                        ) : (
+                                            <div style={{ display: 'grid', gap: '16px', padding: '16px' }}>
+                                                {templates.map((t) => (
+                                                    <div
+                                                        key={t._id}
+                                                        style={{
+                                                            border: '1px solid #e0e0e0',
+                                                            borderRadius: '8px',
+                                                            padding: '16px',
+                                                            background: '#fff',
+                                                        }}
+                                                    >
+                                                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px' }}>
+                                                            <h4 style={{ margin: 0, fontSize: '16px' }}>{t.name}</h4>
+                                                            <div className="flex gap-2">
+                                                                <button
+                                                                    className="btn btn-sm btn-secondary"
+                                                                    onClick={() => {
+                                                                        setEditingTemplate(t);
+                                                                        setShowTemplateModal(true);
+                                                                    }}
+                                                                >
+                                                                    Edit
+                                                                </button>
+                                                                <button
+                                                                    className="btn btn-sm btn-danger"
+                                                                    onClick={() => handleDeleteTemplate(t._id)}
+                                                                >
+                                                                    Delete
+                                                                </button>
+                                                            </div>
+                                                        </div>
+                                                        <div
+                                                            style={{
+                                                                background: '#f5f5f5',
+                                                                padding: '12px',
+                                                                borderRadius: '4px',
+                                                                whiteSpace: 'pre-wrap',
+                                                                fontSize: '13px',
+                                                                maxHeight: '150px',
+                                                                overflow: 'auto',
+                                                            }}
+                                                        >
+                                                            {t.body}
+                                                        </div>
+                                                        <div style={{ marginTop: '8px', fontSize: '12px', color: '#666' }}>
+                                                            Created: {new Date(t.createdAt).toLocaleDateString()}
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </>
                         )}
                     </>
@@ -648,6 +1045,22 @@ export default function Dashboard() {
                     onSave={() => {
                         setShowGuestModal(false);
                         loadTabData();
+                    }}
+                />
+            )}
+
+            {showTemplateModal && selectedWebsite && (
+                <TemplateModal
+                    websiteId={selectedWebsite._id}
+                    template={editingTemplate}
+                    onClose={() => {
+                        setShowTemplateModal(false);
+                        setEditingTemplate(null);
+                    }}
+                    onSave={() => {
+                        setShowTemplateModal(false);
+                        setEditingTemplate(null);
+                        loadTemplates();
                     }}
                 />
             )}

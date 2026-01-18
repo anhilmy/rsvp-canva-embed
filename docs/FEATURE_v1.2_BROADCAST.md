@@ -433,31 +433,31 @@ Add new tab "Broadcast" in admin dashboard:
 
 ### Backend
 
-- [ ] Create `BroadcastTemplate` model
-- [ ] Create `broadcastTemplateService.ts`
-- [ ] Create `broadcastTemplates.ts` routes
-- [ ] Update `Guest` model (add `greeting`, `personalLink`)
-- [ ] Update `guestService.ts` for new fields
-- [ ] Update guest validation schema
-- [ ] Update bulk import parsing
-- [ ] Create export endpoint with Excel generation
-- [ ] Install `exceljs` package
+- [x] Create `BroadcastTemplate` model
+- [x] Create `broadcastTemplateService.ts`
+- [x] Create `broadcastTemplates.ts` routes
+- [x] Update `Guest` model (add `greeting`, `personalLink`)
+- [x] Update `guestService.ts` for new fields
+- [x] Update guest validation schema
+- [x] Update bulk import parsing (backend already supports new fields via schema)
+- [x] Create export endpoint with Excel generation
+- [x] Install `exceljs` package
 - [ ] Add tests for new endpoints
 
 ### Frontend (Admin App)
 
-- [ ] Update `Guest` interface in `api.ts`
-- [ ] Add `BroadcastTemplate` interface
-- [ ] Add broadcast API functions
-- [ ] Update guest table columns (add phone, greeting)
-- [ ] Add checkbox selection to guest rows
-- [ ] Add template selector dropdown
-- [ ] Add "Copy Broadcast" button
-- [ ] Add "Export Selected" button
-- [ ] Create Broadcast tab
-- [ ] Create template editor modal
-- [ ] Update bulk import modal with new format
-- [ ] Update single guest form with new fields
+- [x] Update `Guest` interface in `api.ts`
+- [x] Add `BroadcastTemplate` interface
+- [x] Add broadcast API functions
+- [x] Update guest table columns (add phone, greeting)
+- [x] Add checkbox selection to guest rows
+- [x] Add template selector dropdown
+- [x] Add "Copy Broadcast" button
+- [x] Add "Export Selected" button
+- [x] Create Broadcast tab
+- [x] Create template editor modal
+- [x] Update bulk import modal with new format
+- [x] Update single guest form with new fields
 
 ### Testing
 

@@ -23,6 +23,11 @@ async function apiFetch<T>(
         throw new Error(error.error || error.message || 'Request failed');
     }
 
+    // Handle 204 No Content responses
+    if (response.status === 204) {
+        return {} as T;
+    }
+
     return response.json();
 }
 
@@ -43,6 +48,8 @@ export interface Guest {
     name: string;
     email?: string;
     phone?: string;
+    greeting?: string;
+    personalLink?: string;
     uniqueCode: string;
     maxAttendees: number;
     isManual: boolean;
@@ -83,6 +90,16 @@ export interface RSVPStats {
     totalAttendees: number;
 }
 
+// Broadcast Template
+export interface BroadcastTemplate {
+    _id: string;
+    websiteId: string;
+    name: string;
+    body: string;
+    createdAt: string;
+    updatedAt: string;
+}
+
 // Website API
 export const websiteApi = {
     getAll: () => apiFetch<{ websites: Website[]; total: number; pages: number }>('/websites'),
@@ -101,15 +118,32 @@ export const guestApi = {
         apiFetch<{ guests: Guest[]; total: number; pages: number }>(
             `/guests/website/${websiteId}?page=${page}&limit=${limit}`
         ),
-    create: (websiteId: string, data: { name: string; email?: string; maxAttendees?: number }) =>
+    create: (websiteId: string, data: { name: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string }) =>
         apiFetch<Guest>(`/guests/${websiteId}`, { method: 'POST', body: JSON.stringify(data) }),
-    createBulk: (websiteId: string, guests: Array<{ name: string; email?: string; maxAttendees?: number }>) =>
+    createBulk: (websiteId: string, guests: Array<{ name: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string }>) =>
         apiFetch<{ guests: Guest[]; count: number }>(`/guests/${websiteId}/bulk`, {
             method: 'POST',
             body: JSON.stringify({ guests }),
         }),
+    update: (id: string, data: { name?: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string }) =>
+        apiFetch<Guest>(`/guests/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
         apiFetch<{ message: string }>(`/guests/${id}`, { method: 'DELETE' }),
+    exportToExcel: async (websiteId: string, guestIds: string[], templateId?: string): Promise<Blob> => {
+        const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
+        const response = await fetch(`${API_BASE_URL}/guests/${websiteId}/export`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${getToken()}`,
+            },
+            body: JSON.stringify({ guestIds, templateId, baseUrl }),
+        });
+        if (!response.ok) {
+            throw new Error('Export failed');
+        }
+        return response.blob();
+    },
 };
 
 // RSVP API
@@ -135,3 +169,44 @@ export const wishApi = {
     delete: (id: string) =>
         apiFetch<{ message: string }>(`/wishes/${id}`, { method: 'DELETE' }),
 };
+
+// Broadcast Template API
+export const broadcastTemplateApi = {
+    getByWebsite: (websiteId: string, page = 1, limit = 20) =>
+        apiFetch<{ templates: BroadcastTemplate[]; total: number; pages: number }>(
+            `/broadcast-templates/${websiteId}?page=${page}&limit=${limit}`
+        ),
+    getAllByWebsite: (websiteId: string) =>
+        apiFetch<{ templates: BroadcastTemplate[] }>(`/broadcast-templates/${websiteId}/all`),
+    getById: (websiteId: string, id: string) =>
+        apiFetch<BroadcastTemplate>(`/broadcast-templates/${websiteId}/${id}`),
+    create: (websiteId: string, data: { name: string; body: string }) =>
+        apiFetch<BroadcastTemplate>(`/broadcast-templates/${websiteId}`, {
+            method: 'POST',
+            body: JSON.stringify(data),
+        }),
+    update: (id: string, data: { name?: string; body?: string }) =>
+        apiFetch<BroadcastTemplate>(`/broadcast-templates/${id}`, {
+            method: 'PUT',
+            body: JSON.stringify(data),
+        }),
+    delete: (id: string) =>
+        apiFetch<{ success: boolean; message: string }>(`/broadcast-templates/${id}`, {
+            method: 'DELETE',
+        }),
+};
+
+// Helper function to fill template with guest data
+export function fillBroadcastTemplate(
+    templateBody: string,
+    guest: Guest,
+    baseUrl: string,
+    publishId: string
+): string {
+    const link = guest.personalLink || `${baseUrl}/f/simple/${publishId}?code=${guest.uniqueCode}`;
+
+    return templateBody
+        .replace(/\[to\]/g, guest.name)
+        .replace(/\[greeting\]/g, guest.greeting || '')
+        .replace(/\[link\]/g, link);
+}
