@@ -27,6 +27,7 @@ export const createGuestSchema = z.object({
     maxAttendees: z.number().int().min(1).max(20).default(1),
     greeting: z.string().max(16, 'Greeting must be 16 characters or less').optional(),
     personalLink: z.string().optional(),
+    label: z.string().max(50, 'Label must be 50 characters or less').optional(),
 });
 
 export const updateGuestSchema = z.object({
@@ -36,6 +37,7 @@ export const updateGuestSchema = z.object({
     maxAttendees: z.number().int().min(1).max(20).optional(),
     greeting: z.string().max(16, 'Greeting must be 16 characters or less').optional(),
     personalLink: z.string().optional(),
+    label: z.string().max(50, 'Label must be 50 characters or less').optional(),
 });
 
 export const createGuestBulkSchema = z.object({
@@ -98,6 +100,11 @@ export const updateBroadcastTemplateSchema = z.object({
     body: z.string().min(1).max(5000).optional(),
 });
 
+// Bulk delete schema
+export const bulkDeleteSchema = z.object({
+    ids: z.array(z.string()).min(1, 'At least one ID required').max(500),
+});
+
 // Type exports
 export type CreateWebsiteInput = z.infer<typeof createWebsiteSchema>;
 export type UpdateWebsiteInput = z.infer<typeof updateWebsiteSchema>;
@@ -112,3 +119,4 @@ export type PaginationInput = z.infer<typeof paginationSchema>;
 export type UpdateGuestInput = z.infer<typeof updateGuestSchema>;
 export type CreateBroadcastTemplateInput = z.infer<typeof createBroadcastTemplateSchema>;
 export type UpdateBroadcastTemplateInput = z.infer<typeof updateBroadcastTemplateSchema>;
+export type BulkDeleteInput = z.infer<typeof bulkDeleteSchema>;

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { wishService } from '../services';
 import { validate, adminAuth, wishLimiter } from '../middleware';
-import { createWishSchema, updateWishSchema, paginationSchema } from '../validators';
+import { createWishSchema, updateWishSchema, paginationSchema, bulkDeleteSchema } from '../validators';
 
 const router = Router();
 
@@ -150,6 +150,23 @@ router.delete(
                 return;
             }
             res.status(204).send();
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Bulk delete wishes
+router.delete(
+    '/:websiteId/bulk',
+    adminAuth,
+    validate(bulkDeleteSchema),
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { websiteId } = req.params as { websiteId: string };
+            const { ids } = req.body as { ids: string[] };
+            const deletedCount = await wishService.bulkDelete(websiteId, ids);
+            res.json({ success: true, deleted: deletedCount });
         } catch (error) {
             next(error);
         }

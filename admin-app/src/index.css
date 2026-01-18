@@ -309,6 +309,11 @@ tbody tr:hover {
   color: var(--gray-700);
 }
 
+.badge-info {
+  background: #dbeafe;
+  color: #1e40af;
+}
+
 .alert {
   padding: 10px 14px;
   border-radius: 6px;

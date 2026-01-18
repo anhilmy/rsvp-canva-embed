@@ -234,6 +234,14 @@ export class RSVPService {
             stats,
         };
     }
+
+    async bulkDelete(websiteId: string, ids: string[]): Promise<number> {
+        const result = await RSVP.deleteMany({
+            _id: { $in: ids },
+            websiteId: new Types.ObjectId(websiteId),
+        });
+        return result.deletedCount;
+    }
 }
 
 export const rsvpService = new RSVPService();

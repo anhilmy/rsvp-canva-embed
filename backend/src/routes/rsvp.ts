@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { rsvpService } from '../services';
 import { validate, adminAuth, submitLimiter } from '../middleware';
-import { createRSVPSchema, updateRSVPSchema, paginationSchema } from '../validators';
+import { createRSVPSchema, updateRSVPSchema, paginationSchema, bulkDeleteSchema } from '../validators';
 
 const router = Router();
 
@@ -90,6 +90,23 @@ router.get(
             const { page, limit } = req.query as unknown as { page: number; limit: number };
             const result = await rsvpService.getGuestStatus(websiteId, page, limit);
             res.json(result);
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Bulk delete RSVPs
+router.delete(
+    '/:websiteId/bulk',
+    adminAuth,
+    validate(bulkDeleteSchema),
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { websiteId } = req.params as { websiteId: string };
+            const { ids } = req.body as { ids: string[] };
+            const deletedCount = await rsvpService.bulkDelete(websiteId, ids);
+            res.json({ success: true, deleted: deletedCount });
         } catch (error) {
             next(error);
         }

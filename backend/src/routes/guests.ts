@@ -1,9 +1,15 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { guestService, broadcastTemplateService } from '../services';
 import { validate, adminAuth } from '../middleware';
-import { createGuestSchema, createGuestBulkSchema, validateGuestSchema, paginationSchema, updateGuestSchema } from '../validators';
+import { createGuestSchema, createGuestBulkSchema, validateGuestSchema, paginationSchema, updateGuestSchema, bulkDeleteSchema } from '../validators';
 import { Website, Guest } from '../models';
 import ExcelJS from 'exceljs';
+import { z } from 'zod';
+
+// Extended pagination schema with label filter
+const guestPaginationSchema = paginationSchema.extend({
+    label: z.string().optional(),
+});
 
 const router = Router();
 
@@ -69,12 +75,12 @@ router.post(
 router.get(
     '/website/:websiteId',
     adminAuth,
-    validate(paginationSchema, 'query'),
+    validate(guestPaginationSchema, 'query'),
     async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { websiteId } = req.params as { websiteId: string };
-            const { page, limit } = req.query as unknown as { page: number; limit: number };
-            const result = await guestService.findByWebsite(websiteId, page, limit);
+            const { page, limit, label } = req.query as unknown as { page: number; limit: number; label?: string };
+            const result = await guestService.findByWebsite(websiteId, page, limit, label);
             res.json(result);
         } catch (error) {
             next(error);
@@ -150,6 +156,57 @@ router.get(
             }
             const link = await guestService.generateShareableLink(id, baseUrl);
             res.json({ link });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Bulk delete guests
+router.delete(
+    '/:websiteId/bulk',
+    adminAuth,
+    validate(bulkDeleteSchema),
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { websiteId } = req.params as { websiteId: string };
+            const { ids } = req.body as { ids: string[] };
+            const deletedCount = await guestService.bulkDelete(websiteId, ids);
+            res.json({ success: true, deleted: deletedCount });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Mark invitation as sent
+router.put(
+    '/:id/mark-invitation-sent',
+    adminAuth,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { id } = req.params as { id: string };
+            const guest = await guestService.markInvitationSent(id);
+            if (!guest) {
+                res.status(404).json({ error: 'Guest not found' });
+                return;
+            }
+            res.json(guest);
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Get all labels for a website
+router.get(
+    '/:websiteId/labels',
+    adminAuth,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { websiteId } = req.params as { websiteId: string };
+            const labels = await guestService.getLabels(websiteId);
+            res.json({ labels });
         } catch (error) {
             next(error);
         }
