@@ -131,6 +131,14 @@ export class WishService {
         await wish.save();
         return wish;
     }
+
+    async bulkDelete(websiteId: string, ids: string[]): Promise<number> {
+        const result = await Wish.deleteMany({
+            _id: { $in: ids },
+            websiteId: new Types.ObjectId(websiteId),
+        });
+        return result.deletedCount;
+    }
 }
 
 export const wishService = new WishService();

@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { websiteApi, guestApi, rsvpApi, wishApi, broadcastTemplateApi, fillBroadcastTemplate } from '../api';
-import type { Website, Guest, GuestWithRSVP, RSVPStats, Wish, BroadcastTemplate } from '../api';
+import type { Website, Guest, GuestWithRSVP, RSVPStats, Wish, BroadcastTemplate, InvitationStatus } from '../api';
 
 interface WebsiteModalProps {
     website?: Website | null;
@@ -214,7 +214,7 @@ function TemplateModal({ websiteId, template, onClose, onSave }: TemplateModalPr
 
 function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
     const [mode, setMode] = useState<'single' | 'bulk'>('single');
-    const [form, setForm] = useState({ name: '', email: '', phone: '', greeting: '', maxAttendees: 1, personalLink: '' });
+    const [form, setForm] = useState({ name: '', email: '', phone: '', greeting: '', maxAttendees: 1, personalLink: '', label: '' });
     const [bulkText, setBulkText] = useState('');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -228,6 +228,7 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
             greeting: parts[3] || undefined,
             maxAttendees: parts[4] ? parseInt(parts[4]) : 1,
             personalLink: parts[5] || undefined,
+            label: parts[6] || undefined,
         };
     };
 
@@ -244,6 +245,7 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                     greeting: form.greeting || undefined,
                     maxAttendees: form.maxAttendees,
                     personalLink: form.personalLink || undefined,
+                    label: form.label || undefined,
                 });
             } else {
                 const lines = bulkText.split('\n').filter((l) => l.trim());
@@ -325,6 +327,16 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                                     />
                                 </div>
                                 <div className="form-group">
+                                    <label className="form-label">Label</label>
+                                    <input
+                                        className="form-input"
+                                        value={form.label}
+                                        onChange={(e) => setForm({ ...form, label: e.target.value.slice(0, 50) })}
+                                        placeholder="Family, Friends, Work, VIP, etc."
+                                        maxLength={50}
+                                    />
+                                </div>
+                                <div className="form-group">
                                     <label className="form-label">Max Attendees</label>
                                     <input
                                         className="form-input"
@@ -349,7 +361,7 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                             <div className="form-group">
                                 <label className="form-label">Guest List (one per line)</label>
                                 <p style={{ fontSize: '12px', color: '#666', marginBottom: '8px' }}>
-                                    Format: name, email, phone, greeting, maxAttendees, personalLink<br />
+                                    Format: name, email, phone, greeting, maxAttendees, personalLink, label<br />
                                     All fields after name are optional.
                                 </p>
                                 <textarea
@@ -357,7 +369,7 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                                     style={{ minHeight: '150px' }}
                                     value={bulkText}
                                     onChange={(e) => setBulkText(e.target.value)}
-                                    placeholder="John Doe, john@example.com, +628123456789, Bapak, 3&#10;Jane Smith, jane@example.com&#10;Bob Wilson"
+                                    placeholder="John Doe, john@example.com, +628123456789, Bapak, 3, , Family&#10;Jane Smith, jane@example.com, , Ibu, 2, , Friends&#10;Bob Wilson"
                                 />
                             </div>
                         )}
@@ -366,6 +378,147 @@ function GuestModal({ websiteId, onClose, onSave }: GuestModalProps) {
                         <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
                         <button type="submit" className="btn btn-primary" disabled={loading}>
                             {loading ? 'Adding...' : 'Add'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
+}
+
+interface EditGuestModalProps {
+    guest: Guest;
+    onClose: () => void;
+    onSave: () => void;
+}
+
+function EditGuestModal({ guest, onClose, onSave }: EditGuestModalProps) {
+    const [form, setForm] = useState({
+        name: guest.name,
+        email: guest.email || '',
+        phone: guest.phone || '',
+        greeting: guest.greeting || '',
+        maxAttendees: guest.maxAttendees,
+        personalLink: guest.personalLink || '',
+        label: guest.label || '',
+    });
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState('');
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        setLoading(true);
+        setError('');
+        try {
+            await guestApi.update(guest._id, {
+                name: form.name,
+                email: form.email || undefined,
+                phone: form.phone || undefined,
+                greeting: form.greeting || undefined,
+                maxAttendees: form.maxAttendees,
+                personalLink: form.personalLink || undefined,
+                label: form.label || undefined,
+            });
+            onSave();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to save');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <div className="modal-overlay" onClick={onClose}>
+            <div className="modal" onClick={(e) => e.stopPropagation()}>
+                <div className="modal-header">
+                    <h3 className="modal-title">Edit Guest</h3>
+                    <button className="modal-close" onClick={onClose}>×</button>
+                </div>
+                <form onSubmit={handleSubmit}>
+                    <div className="modal-body">
+                        {error && <div className="alert alert-error">{error}</div>}
+                        <div className="form-group">
+                            <label className="form-label">Code (cannot be changed)</label>
+                            <input
+                                className="form-input"
+                                value={guest.uniqueCode}
+                                disabled
+                                style={{ background: '#f5f5f5', cursor: 'not-allowed' }}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Name *</label>
+                            <input
+                                className="form-input"
+                                value={form.name}
+                                onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                required
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Email</label>
+                            <input
+                                className="form-input"
+                                type="email"
+                                value={form.email}
+                                onChange={(e) => setForm({ ...form, email: e.target.value })}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Phone</label>
+                            <input
+                                className="form-input"
+                                type="tel"
+                                value={form.phone}
+                                onChange={(e) => setForm({ ...form, phone: e.target.value })}
+                                placeholder="+628123456789"
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Greeting (max 16 chars)</label>
+                            <input
+                                className="form-input"
+                                value={form.greeting}
+                                onChange={(e) => setForm({ ...form, greeting: e.target.value.slice(0, 16) })}
+                                placeholder="Bapak, Ibu, Kakak, etc."
+                                maxLength={16}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Label</label>
+                            <input
+                                className="form-input"
+                                value={form.label}
+                                onChange={(e) => setForm({ ...form, label: e.target.value.slice(0, 50) })}
+                                placeholder="Family, Friends, Work, VIP, etc."
+                                maxLength={50}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Max Attendees</label>
+                            <input
+                                className="form-input"
+                                type="number"
+                                min="1"
+                                max="20"
+                                value={form.maxAttendees}
+                                onChange={(e) => setForm({ ...form, maxAttendees: parseInt(e.target.value) || 1 })}
+                            />
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Personal Link (optional)</label>
+                            <input
+                                className="form-input"
+                                value={form.personalLink}
+                                onChange={(e) => setForm({ ...form, personalLink: e.target.value })}
+                                placeholder="Custom RSVP link override"
+                            />
+                        </div>
+                    </div>
+                    <div className="modal-footer">
+                        <button type="button" className="btn btn-secondary" onClick={onClose}>Cancel</button>
+                        <button type="submit" className="btn btn-primary" disabled={loading}>
+                            {loading ? 'Saving...' : 'Save Changes'}
                         </button>
                     </div>
                 </form>
@@ -395,6 +548,16 @@ export default function Dashboard() {
     const [editingTemplate, setEditingTemplate] = useState<BroadcastTemplate | null>(null);
     const [exporting, setExporting] = useState(false);
 
+    // v1.3 state
+    const [availableLabels, setAvailableLabels] = useState<string[]>([]);
+    const [selectedLabelFilter, setSelectedLabelFilter] = useState<string>('');
+    const [showEditGuestModal, setShowEditGuestModal] = useState(false);
+    const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
+    const [selectedWishIds, setSelectedWishIds] = useState<Set<string>>(new Set());
+    const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [showTemplateFocus, setShowTemplateFocus] = useState(false);
+    const templateSelectRef = useRef<HTMLSelectElement>(null);
+
     // Load websites
     useEffect(() => {
         loadWebsites();
@@ -408,10 +571,20 @@ export default function Dashboard() {
         }
     }, [selectedWebsite, activeTab]);
 
+    // Reload guests when label filter changes
+    useEffect(() => {
+        if (selectedWebsite && activeTab === 'guests') {
+            loadTabData();
+        }
+    }, [selectedLabelFilter]);
+
     // Clear selection when website changes
     useEffect(() => {
         setSelectedGuestIds(new Set());
         setSelectedTemplateId('');
+        setSelectedLabelFilter('');
+        setSelectedWishIds(new Set());
+        setAvailableLabels([]);
     }, [selectedWebsite]);
 
     const loadWebsites = async () => {
@@ -433,8 +606,9 @@ export default function Dashboard() {
         setLoading(true);
         try {
             if (activeTab === 'guests') {
-                const data = await guestApi.getByWebsite(selectedWebsite._id);
+                const data = await guestApi.getByWebsite(selectedWebsite._id, 1, 50, selectedLabelFilter || undefined);
                 setGuests(data.guests);
+                setAvailableLabels(data.labels || []);
             } else if (activeTab === 'rsvp') {
                 const data = await rsvpApi.getGuestStatus(selectedWebsite._id);
                 setGuestsWithRSVP(data.guests);
@@ -464,11 +638,21 @@ export default function Dashboard() {
         return templates.find(t => t._id === selectedTemplateId);
     };
 
+    const focusTemplateSelect = () => {
+        setShowTemplateFocus(true);
+        window.setTimeout(() => {
+            templateSelectRef.current?.focus();
+        }, 0);
+        window.setTimeout(() => {
+            setShowTemplateFocus(false);
+        }, 1200);
+    };
+
     const handleCopyBroadcast = async (guest: Guest) => {
         if (!selectedWebsite) return;
         const template = getSelectedTemplate();
         if (!template) {
-            alert('Please select a template first');
+            focusTemplateSelect();
             return;
         }
 
@@ -477,6 +661,22 @@ export default function Dashboard() {
 
         try {
             await navigator.clipboard.writeText(filledMessage);
+
+            // Mark invitation as sent
+            if (guest.invitationStatus !== 'invitation_sent') {
+                try {
+                    await guestApi.markInvitationSent(guest._id);
+                    // Update local state
+                    setGuests(prev => prev.map(g =>
+                        g._id === guest._id
+                            ? { ...g, invitationStatus: 'invitation_sent' as InvitationStatus, invitationSentAt: new Date().toISOString() }
+                            : g
+                    ));
+                } catch (err) {
+                    console.error('Failed to update invitation status:', err);
+                }
+            }
+
             alert(`Broadcast message copied for ${guest.name}!`);
         } catch (err) {
             prompt('Copy this message:', filledMessage);
@@ -599,6 +799,63 @@ export default function Dashboard() {
         }
     };
 
+    // Bulk delete handlers
+    const handleBulkDeleteGuests = async () => {
+        if (!selectedWebsite || selectedGuestIds.size === 0) return;
+        if (!confirm(`Delete ${selectedGuestIds.size} selected guest(s)? This cannot be undone.`)) return;
+        setBulkDeleting(true);
+        try {
+            await guestApi.bulkDelete(selectedWebsite._id, Array.from(selectedGuestIds));
+            setSelectedGuestIds(new Set());
+            loadTabData();
+        } catch (err) {
+            alert('Failed to delete guests');
+        } finally {
+            setBulkDeleting(false);
+        }
+    };
+
+    const handleBulkDeleteWishes = async () => {
+        if (!selectedWebsite || selectedWishIds.size === 0) return;
+        if (!confirm(`Delete ${selectedWishIds.size} selected wish(es)? This cannot be undone.`)) return;
+        setBulkDeleting(true);
+        try {
+            await wishApi.bulkDelete(selectedWebsite._id, Array.from(selectedWishIds));
+            setSelectedWishIds(new Set());
+            loadTabData();
+        } catch (err) {
+            alert('Failed to delete wishes');
+        } finally {
+            setBulkDeleting(false);
+        }
+    };
+
+    const handleToggleWishSelection = (id: string) => {
+        setSelectedWishIds(prev => {
+            const newSet = new Set(prev);
+            if (newSet.has(id)) {
+                newSet.delete(id);
+            } else {
+                newSet.add(id);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAllWishes = () => {
+        if (selectedWishIds.size === wishes.length && wishes.length > 0) {
+            setSelectedWishIds(new Set());
+        } else {
+            setSelectedWishIds(new Set(wishes.map(w => w._id)));
+        }
+    };
+
+    // Edit guest handler
+    const handleEditGuest = (guest: Guest) => {
+        setEditingGuest(guest);
+        setShowEditGuestModal(true);
+    };
+
     return (
         <div className="app">
             <aside className="sidebar">
@@ -638,6 +895,12 @@ export default function Dashboard() {
             </aside>
 
             <main className="main-content">
+                {showTemplateFocus && (
+                    <div
+                        className="template-focus-overlay"
+                        onClick={() => setShowTemplateFocus(false)}
+                    />
+                )}
                 {!selectedWebsite ? (
                     <div className="empty-state">
                         <h3>No website selected</h3>
@@ -710,6 +973,18 @@ export default function Dashboard() {
                                             <div className="flex gap-2 items-center">
                                                 <select
                                                     className="form-input"
+                                                    style={{ width: 'auto', minWidth: '120px' }}
+                                                    value={selectedLabelFilter}
+                                                    onChange={(e) => setSelectedLabelFilter(e.target.value)}
+                                                >
+                                                    <option value="">All Labels</option>
+                                                    {availableLabels.map(label => (
+                                                        <option key={label} value={label}>{label}</option>
+                                                    ))}
+                                                </select>
+                                                <select
+                                                    ref={templateSelectRef}
+                                                    className={`form-input ${showTemplateFocus ? 'template-select-highlight' : ''}`}
                                                     style={{ width: 'auto', minWidth: '200px' }}
                                                     value={selectedTemplateId}
                                                     onChange={(e) => setSelectedTemplateId(e.target.value)}
@@ -739,7 +1014,9 @@ export default function Dashboard() {
                                                         </th>
                                                         <th>Name</th>
                                                         <th>Phone</th>
+                                                        <th>Label</th>
                                                         <th>Greeting</th>
+                                                        <th>Status</th>
                                                         <th>Type</th>
                                                         <th>Code</th>
                                                         <th>Max</th>
@@ -758,7 +1035,20 @@ export default function Dashboard() {
                                                             </td>
                                                             <td>{g.name}</td>
                                                             <td>{g.phone || '-'}</td>
+                                                            <td>
+                                                                {g.label ? (
+                                                                    <span className="badge badge-info">{g.label}</span>
+                                                                ) : '-'}
+                                                            </td>
                                                             <td>{g.greeting || '-'}</td>
+                                                            <td>
+                                                                <span
+                                                                    className={`badge ${g.invitationStatus === 'invitation_sent' ? 'badge-success' : 'badge-gray'}`}
+                                                                    title={g.invitationSentAt ? `Sent: ${new Date(g.invitationSentAt).toLocaleString()}` : ''}
+                                                                >
+                                                                    {g.invitationStatus === 'invitation_sent' ? 'Sent' : 'Created'}
+                                                                </span>
+                                                            </td>
                                                             <td>
                                                                 <span className={`badge ${g.isManual ? 'badge-warning' : 'badge-success'}`}>
                                                                     {g.isManual ? 'Walk-in' : 'Invited'}
@@ -768,6 +1058,13 @@ export default function Dashboard() {
                                                             <td>{g.maxAttendees}</td>
                                                             <td>
                                                                 <div className="flex gap-2">
+                                                                    <button
+                                                                        className="btn btn-sm btn-secondary"
+                                                                        onClick={() => handleEditGuest(g)}
+                                                                        title="Edit guest"
+                                                                    >
+                                                                        ✏️
+                                                                    </button>
                                                                     {!g.isManual && (
                                                                         <button
                                                                             className="btn btn-sm btn-secondary"
@@ -781,7 +1078,6 @@ export default function Dashboard() {
                                                                         className="btn btn-sm btn-secondary"
                                                                         onClick={() => handleCopyBroadcast(g)}
                                                                         title={selectedTemplateId ? 'Copy broadcast message' : 'Select a template first'}
-                                                                        disabled={!selectedTemplateId}
                                                                     >
                                                                         📋
                                                                     </button>
@@ -802,6 +1098,13 @@ export default function Dashboard() {
                                         {selectedGuestIds.size > 0 && (
                                             <div style={{ padding: '12px', borderTop: '1px solid #eee', background: '#f9f9f9', display: 'flex', alignItems: 'center', gap: '12px' }}>
                                                 <span>{selectedGuestIds.size} guest(s) selected</span>
+                                                <button
+                                                    className="btn btn-danger btn-sm"
+                                                    onClick={handleBulkDeleteGuests}
+                                                    disabled={bulkDeleting}
+                                                >
+                                                    {bulkDeleting ? 'Deleting...' : `🗑️ Delete Selected (${selectedGuestIds.size})`}
+                                                </button>
                                                 <button
                                                     className="btn btn-primary btn-sm"
                                                     onClick={handleExportGuests}
@@ -893,13 +1196,31 @@ export default function Dashboard() {
 
                                 {activeTab === 'wishes' && (
                                     <div className="card">
-                                        <h3 className="card-title mb-2">Wishes ({wishes.length})</h3>
+                                        <div className="card-header">
+                                            <h3 className="card-title">Wishes ({wishes.length})</h3>
+                                            {selectedWishIds.size > 0 && (
+                                                <button
+                                                    className="btn btn-danger btn-sm"
+                                                    onClick={handleBulkDeleteWishes}
+                                                    disabled={bulkDeleting}
+                                                >
+                                                    {bulkDeleting ? 'Deleting...' : `🗑️ Delete Selected (${selectedWishIds.size})`}
+                                                </button>
+                                            )}
+                                        </div>
                                         {wishes.length === 0 ? (
                                             <div className="empty-state">No wishes yet</div>
                                         ) : (
                                             <table>
                                                 <thead>
                                                     <tr>
+                                                        <th style={{ width: '40px' }}>
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={selectedWishIds.size === wishes.length && wishes.length > 0}
+                                                                onChange={handleSelectAllWishes}
+                                                            />
+                                                        </th>
                                                         <th>From</th>
                                                         <th>Message</th>
                                                         <th>Status</th>
@@ -910,6 +1231,13 @@ export default function Dashboard() {
                                                 <tbody>
                                                     {wishes.map((w) => (
                                                         <tr key={w._id}>
+                                                            <td>
+                                                                <input
+                                                                    type="checkbox"
+                                                                    checked={selectedWishIds.has(w._id)}
+                                                                    onChange={() => handleToggleWishSelection(w._id)}
+                                                                />
+                                                            </td>
                                                             <td>{w.guestName}</td>
                                                             <td style={{ maxWidth: '300px' }}>{w.message}</td>
                                                             <td>
@@ -1061,6 +1389,21 @@ export default function Dashboard() {
                         setShowTemplateModal(false);
                         setEditingTemplate(null);
                         loadTemplates();
+                    }}
+                />
+            )}
+
+            {showEditGuestModal && editingGuest && (
+                <EditGuestModal
+                    guest={editingGuest}
+                    onClose={() => {
+                        setShowEditGuestModal(false);
+                        setEditingGuest(null);
+                    }}
+                    onSave={() => {
+                        setShowEditGuestModal(false);
+                        setEditingGuest(null);
+                        loadTabData();
                     }}
                 />
             )}

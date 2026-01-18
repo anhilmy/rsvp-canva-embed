@@ -442,7 +442,7 @@ Add new tab "Broadcast" in admin dashboard:
 - [x] Update bulk import parsing (backend already supports new fields via schema)
 - [x] Create export endpoint with Excel generation
 - [x] Install `exceljs` package
-- [ ] Add tests for new endpoints
+- [x] Add tests for new endpoints
 
 ### Frontend (Admin App)
 
@@ -461,12 +461,12 @@ Add new tab "Broadcast" in admin dashboard:
 
 ### Testing
 
-- [ ] Test broadcast template CRUD
-- [ ] Test guest creation with new fields
-- [ ] Test bulk import with all field variations
-- [ ] Test template variable replacement
-- [ ] Test Excel export generation
-- [ ] Test clipboard copy functionality
+- [x] Test broadcast template CRUD
+- [x] Test guest creation with new fields
+- [x] Test bulk import with all field variations
+- [x] Test template variable replacement
+- [x] Test Excel export generation
+- [x] Test clipboard copy functionality
 
 ---
 

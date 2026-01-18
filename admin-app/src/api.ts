@@ -42,6 +42,8 @@ export interface Website {
     createdAt: string;
 }
 
+export type InvitationStatus = 'created' | 'invitation_sent';
+
 export interface Guest {
     _id: string;
     websiteId: string;
@@ -50,6 +52,9 @@ export interface Guest {
     phone?: string;
     greeting?: string;
     personalLink?: string;
+    label?: string;
+    invitationStatus: InvitationStatus;
+    invitationSentAt?: string;
     uniqueCode: string;
     maxAttendees: number;
     isManual: boolean;
@@ -114,21 +119,33 @@ export const websiteApi = {
 
 // Guest API
 export const guestApi = {
-    getByWebsite: (websiteId: string, page = 1, limit = 50) =>
-        apiFetch<{ guests: Guest[]; total: number; pages: number }>(
-            `/guests/website/${websiteId}?page=${page}&limit=${limit}`
-        ),
-    create: (websiteId: string, data: { name: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string }) =>
+    getByWebsite: (websiteId: string, page = 1, limit = 50, label?: string) => {
+        let url = `/guests/website/${websiteId}?page=${page}&limit=${limit}`;
+        if (label) {
+            url += `&label=${encodeURIComponent(label)}`;
+        }
+        return apiFetch<{ guests: Guest[]; total: number; pages: number; labels: string[] }>(url);
+    },
+    create: (websiteId: string, data: { name: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string; label?: string }) =>
         apiFetch<Guest>(`/guests/${websiteId}`, { method: 'POST', body: JSON.stringify(data) }),
-    createBulk: (websiteId: string, guests: Array<{ name: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string }>) =>
+    createBulk: (websiteId: string, guests: Array<{ name: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string; label?: string }>) =>
         apiFetch<{ guests: Guest[]; count: number }>(`/guests/${websiteId}/bulk`, {
             method: 'POST',
             body: JSON.stringify({ guests }),
         }),
-    update: (id: string, data: { name?: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string }) =>
+    update: (id: string, data: { name?: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string; label?: string }) =>
         apiFetch<Guest>(`/guests/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
         apiFetch<{ message: string }>(`/guests/${id}`, { method: 'DELETE' }),
+    bulkDelete: (websiteId: string, ids: string[]) =>
+        apiFetch<{ success: boolean; deleted: number }>(`/guests/${websiteId}/bulk`, {
+            method: 'DELETE',
+            body: JSON.stringify({ ids }),
+        }),
+    markInvitationSent: (id: string) =>
+        apiFetch<Guest>(`/guests/${id}/mark-invitation-sent`, { method: 'PUT' }),
+    getLabels: (websiteId: string) =>
+        apiFetch<{ labels: string[] }>(`/guests/${websiteId}/labels`),
     exportToExcel: async (websiteId: string, guestIds: string[], templateId?: string): Promise<Blob> => {
         const baseUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
         const response = await fetch(`${API_BASE_URL}/guests/${websiteId}/export`, {
@@ -154,6 +171,11 @@ export const rsvpApi = {
         apiFetch<{ guests: GuestWithRSVP[]; total: number; pages: number; stats: RSVPStats }>(
             `/rsvp/status/${websiteId}?page=${page}&limit=${limit}`
         ),
+    bulkDelete: (websiteId: string, ids: string[]) =>
+        apiFetch<{ success: boolean; deleted: number }>(`/rsvp/${websiteId}/bulk`, {
+            method: 'DELETE',
+            body: JSON.stringify({ ids }),
+        }),
 };
 
 // Wish API
@@ -168,6 +190,11 @@ export const wishApi = {
         apiFetch<Wish>(`/wishes/${id}/toggle-visibility`, { method: 'POST' }),
     delete: (id: string) =>
         apiFetch<{ message: string }>(`/wishes/${id}`, { method: 'DELETE' }),
+    bulkDelete: (websiteId: string, ids: string[]) =>
+        apiFetch<{ success: boolean; deleted: number }>(`/wishes/${websiteId}/bulk`, {
+            method: 'DELETE',
+            body: JSON.stringify({ ids }),
+        }),
 };
 
 // Broadcast Template API

@@ -94,24 +94,39 @@ export class GuestService {
         return Guest.findById(id);
     }
 
-    async findByWebsite(websiteId: string, page: number = 1, limit: number = 20): Promise<{
+    async findByWebsite(
+        websiteId: string,
+        page: number = 1,
+        limit: number = 20,
+        label?: string
+    ): Promise<{
         guests: IGuest[];
         total: number;
         pages: number;
+        labels: string[];
     }> {
+        const query: { websiteId: Types.ObjectId; label?: string } = {
+            websiteId: new Types.ObjectId(websiteId),
+        };
+        if (label) {
+            query.label = label;
+        }
+
         const skip = (page - 1) * limit;
-        const [guests, total] = await Promise.all([
-            Guest.find({ websiteId: new Types.ObjectId(websiteId) })
+        const [guests, total, labels] = await Promise.all([
+            Guest.find(query)
                 .sort({ createdAt: -1 })
                 .skip(skip)
                 .limit(limit),
-            Guest.countDocuments({ websiteId: new Types.ObjectId(websiteId) }),
+            Guest.countDocuments(query),
+            Guest.distinct('label', { websiteId: new Types.ObjectId(websiteId) }),
         ]);
 
         return {
             guests,
             total,
             pages: Math.ceil(total / limit),
+            labels: labels.filter(Boolean) as string[],
         };
     }
 
@@ -154,6 +169,32 @@ export class GuestService {
 
         const website = guest.websiteId as unknown as { publishId: string };
         return `${baseUrl}?code=${guest.uniqueCode}&publishId=${website.publishId}`;
+    }
+
+    async bulkDelete(websiteId: string, ids: string[]): Promise<number> {
+        const result = await Guest.deleteMany({
+            _id: { $in: ids },
+            websiteId: new Types.ObjectId(websiteId),
+        });
+        return result.deletedCount;
+    }
+
+    async markInvitationSent(id: string): Promise<IGuest | null> {
+        return Guest.findByIdAndUpdate(
+            id,
+            {
+                invitationStatus: 'invitation_sent',
+                invitationSentAt: new Date(),
+            },
+            { new: true }
+        );
+    }
+
+    async getLabels(websiteId: string): Promise<string[]> {
+        const labels = await Guest.distinct('label', {
+            websiteId: new Types.ObjectId(websiteId),
+        });
+        return labels.filter(Boolean) as string[];
     }
 }
 
