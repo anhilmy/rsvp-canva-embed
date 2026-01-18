@@ -8,6 +8,8 @@ export interface IGuest extends Document {
     uniqueCode: string;
     maxAttendees: number;
     isManual: boolean; // True if guest was created via public form (walk-in)
+    greeting?: string; // Custom greeting for broadcast messages (max 16 chars)
+    personalLink?: string; // Custom personal link for broadcast messages
     createdAt: Date;
     updatedAt: Date;
 }
@@ -44,6 +46,13 @@ const guestSchema = new Schema<IGuest>(
         isManual: {
             type: Boolean,
             default: false,
+        },
+        greeting: {
+            type: String,
+            maxlength: 16,
+        },
+        personalLink: {
+            type: String,
         },
     },
     {

@@ -1,7 +1,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import { guestService } from '../services';
 import { validate, adminAuth } from '../middleware';
-import { createGuestSchema, createGuestBulkSchema, validateGuestSchema, paginationSchema } from '../validators';
+import { createGuestSchema, createGuestBulkSchema, validateGuestSchema, paginationSchema, updateGuestSchema } from '../validators';
 
 const router = Router();
 
@@ -101,7 +101,7 @@ router.get(
 router.put(
     '/:id',
     adminAuth,
-    validate(createGuestSchema),
+    validate(updateGuestSchema),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { id } = req.params as { id: string };
