@@ -1,6 +1,6 @@
 import { customAlphabet } from 'nanoid';
 import { Guest, IGuest, Website } from '../models';
-import { CreateGuestInput } from '../validators';
+import { CreateGuestInput, UpdateGuestInput } from '../validators';
 import { createError } from '../middleware';
 import { Types } from 'mongoose';
 
@@ -115,7 +115,7 @@ export class GuestService {
         };
     }
 
-    async update(id: string, data: Partial<CreateGuestInput>): Promise<IGuest | null> {
+    async update(id: string, data: UpdateGuestInput): Promise<IGuest | null> {
         return Guest.findByIdAndUpdate(id, data, { new: true });
     }
 

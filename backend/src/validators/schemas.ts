@@ -25,6 +25,17 @@ export const createGuestSchema = z.object({
     email: z.string().email().optional().or(z.literal('')),
     phone: z.string().max(20).optional(),
     maxAttendees: z.number().int().min(1).max(20).default(1),
+    greeting: z.string().max(16, 'Greeting must be 16 characters or less').optional(),
+    personalLink: z.string().optional(),
+});
+
+export const updateGuestSchema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    email: z.string().email().optional().or(z.literal('')),
+    phone: z.string().max(20).optional(),
+    maxAttendees: z.number().int().min(1).max(20).optional(),
+    greeting: z.string().max(16, 'Greeting must be 16 characters or less').optional(),
+    personalLink: z.string().optional(),
 });
 
 export const createGuestBulkSchema = z.object({
@@ -76,6 +87,17 @@ export const adminAuthSchema = z.object({
     password: z.string().min(1, 'Password is required'),
 });
 
+// Broadcast Template schemas
+export const createBroadcastTemplateSchema = z.object({
+    name: z.string().min(1, 'Name is required').max(100),
+    body: z.string().min(1, 'Body is required').max(5000),
+});
+
+export const updateBroadcastTemplateSchema = z.object({
+    name: z.string().min(1).max(100).optional(),
+    body: z.string().min(1).max(5000).optional(),
+});
+
 // Type exports
 export type CreateWebsiteInput = z.infer<typeof createWebsiteSchema>;
 export type UpdateWebsiteInput = z.infer<typeof updateWebsiteSchema>;
@@ -87,3 +109,6 @@ export type UpdateRSVPInput = z.infer<typeof updateRSVPSchema>;
 export type CreateWishInput = z.infer<typeof createWishSchema>;
 export type UpdateWishInput = z.infer<typeof updateWishSchema>;
 export type PaginationInput = z.infer<typeof paginationSchema>;
+export type UpdateGuestInput = z.infer<typeof updateGuestSchema>;
+export type CreateBroadcastTemplateInput = z.infer<typeof createBroadcastTemplateSchema>;
+export type UpdateBroadcastTemplateInput = z.infer<typeof updateBroadcastTemplateSchema>;

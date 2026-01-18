@@ -1,7 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { guestService } from '../services';
+import { guestService, broadcastTemplateService } from '../services';
 import { validate, adminAuth } from '../middleware';
-import { createGuestSchema, createGuestBulkSchema, validateGuestSchema, paginationSchema } from '../validators';
+import { createGuestSchema, createGuestBulkSchema, validateGuestSchema, paginationSchema, updateGuestSchema } from '../validators';
+import { Website, Guest } from '../models';
+import ExcelJS from 'exceljs';
 
 const router = Router();
 
@@ -101,7 +103,7 @@ router.get(
 router.put(
     '/:id',
     adminAuth,
-    validate(createGuestSchema),
+    validate(updateGuestSchema),
     async (req: Request, res: Response, next: NextFunction): Promise<void> => {
         try {
             const { id } = req.params as { id: string };
@@ -148,6 +150,111 @@ router.get(
             }
             const link = await guestService.generateShareableLink(id, baseUrl);
             res.json({ link });
+        } catch (error) {
+            next(error);
+        }
+    }
+);
+
+// Export guests to Excel
+router.post(
+    '/:websiteId/export',
+    adminAuth,
+    async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+        try {
+            const { websiteId } = req.params as { websiteId: string };
+            const { guestIds, templateId, baseUrl } = req.body as { guestIds: string[]; templateId?: string; baseUrl: string };
+
+            if (!guestIds || guestIds.length === 0) {
+                res.status(400).json({ error: 'No guests selected' });
+                return;
+            }
+
+            if (!baseUrl) {
+                res.status(400).json({ error: 'baseUrl is required' });
+                return;
+            }
+
+            // Get website
+            const website = await Website.findById(websiteId);
+            if (!website) {
+                res.status(404).json({ error: 'Website not found' });
+                return;
+            }
+
+            // Get guests
+            const guests = await Guest.find({ _id: { $in: guestIds }, websiteId });
+
+            // Get template if provided
+            let template = null;
+            if (templateId) {
+                template = await broadcastTemplateService.findById(templateId);
+            }
+
+            // Generate Excel
+            const workbook = new ExcelJS.Workbook();
+            const sheet = workbook.addWorksheet('Guests');
+
+            // Define columns
+            sheet.columns = [
+                { header: 'Name', key: 'name', width: 25 },
+                { header: 'Email', key: 'email', width: 30 },
+                { header: 'Phone', key: 'phone', width: 15 },
+                { header: 'Greeting', key: 'greeting', width: 12 },
+                { header: 'Code', key: 'code', width: 10 },
+                { header: 'Max Attendees', key: 'maxAttendees', width: 12 },
+                { header: 'Type', key: 'type', width: 10 },
+                { header: 'RSVP Link', key: 'link', width: 50 },
+                { header: 'Broadcast Message', key: 'broadcast', width: 80 },
+            ];
+
+            // Style header row
+            sheet.getRow(1).font = { bold: true };
+            sheet.getRow(1).fill = {
+                type: 'pattern',
+                pattern: 'solid',
+                fgColor: { argb: 'FFE0E0E0' },
+            };
+
+            // Add rows
+            for (const guest of guests) {
+                const link = guest.personalLink || `${baseUrl}/f/simple/${website.publishId}?code=${guest.uniqueCode}`;
+                let broadcastMessage = '';
+
+                if (template) {
+                    broadcastMessage = broadcastTemplateService.fillTemplate(
+                        template.body,
+                        {
+                            name: guest.name,
+                            greeting: guest.greeting,
+                            personalLink: guest.personalLink,
+                            uniqueCode: guest.uniqueCode,
+                        },
+                        baseUrl,
+                        website.publishId
+                    );
+                }
+
+                sheet.addRow({
+                    name: guest.name,
+                    email: guest.email || '',
+                    phone: guest.phone || '',
+                    greeting: guest.greeting || '',
+                    code: guest.uniqueCode,
+                    maxAttendees: guest.maxAttendees,
+                    type: guest.isManual ? 'Walk-in' : 'Invited',
+                    link,
+                    broadcast: broadcastMessage,
+                });
+            }
+
+            // Generate buffer
+            const buffer = await workbook.xlsx.writeBuffer();
+
+            // Send response
+            res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+            res.setHeader('Content-Disposition', `attachment; filename=guests-${website.publishId}-${Date.now()}.xlsx`);
+            res.send(buffer);
         } catch (error) {
             next(error);
         }
