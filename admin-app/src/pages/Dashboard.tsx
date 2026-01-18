@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { websiteApi, guestApi, rsvpApi, wishApi, broadcastTemplateApi, fillBroadcastTemplate } from '../api';
 import type { Website, Guest, GuestWithRSVP, RSVPStats, Wish, BroadcastTemplate, InvitationStatus } from '../api';
 
@@ -555,6 +555,8 @@ export default function Dashboard() {
     const [editingGuest, setEditingGuest] = useState<Guest | null>(null);
     const [selectedWishIds, setSelectedWishIds] = useState<Set<string>>(new Set());
     const [bulkDeleting, setBulkDeleting] = useState(false);
+    const [showTemplateFocus, setShowTemplateFocus] = useState(false);
+    const templateSelectRef = useRef<HTMLSelectElement>(null);
 
     // Load websites
     useEffect(() => {
@@ -636,11 +638,21 @@ export default function Dashboard() {
         return templates.find(t => t._id === selectedTemplateId);
     };
 
+    const focusTemplateSelect = () => {
+        setShowTemplateFocus(true);
+        window.setTimeout(() => {
+            templateSelectRef.current?.focus();
+        }, 0);
+        window.setTimeout(() => {
+            setShowTemplateFocus(false);
+        }, 1200);
+    };
+
     const handleCopyBroadcast = async (guest: Guest) => {
         if (!selectedWebsite) return;
         const template = getSelectedTemplate();
         if (!template) {
-            alert('Please select a template first');
+            focusTemplateSelect();
             return;
         }
 
@@ -883,6 +895,12 @@ export default function Dashboard() {
             </aside>
 
             <main className="main-content">
+                {showTemplateFocus && (
+                    <div
+                        className="template-focus-overlay"
+                        onClick={() => setShowTemplateFocus(false)}
+                    />
+                )}
                 {!selectedWebsite ? (
                     <div className="empty-state">
                         <h3>No website selected</h3>
@@ -965,7 +983,8 @@ export default function Dashboard() {
                                                     ))}
                                                 </select>
                                                 <select
-                                                    className="form-input"
+                                                    ref={templateSelectRef}
+                                                    className={`form-input ${showTemplateFocus ? 'template-select-highlight' : ''}`}
                                                     style={{ width: 'auto', minWidth: '200px' }}
                                                     value={selectedTemplateId}
                                                     onChange={(e) => setSelectedTemplateId(e.target.value)}
@@ -1059,7 +1078,6 @@ export default function Dashboard() {
                                                                         className="btn btn-sm btn-secondary"
                                                                         onClick={() => handleCopyBroadcast(g)}
                                                                         title={selectedTemplateId ? 'Copy broadcast message' : 'Select a template first'}
-                                                                        disabled={!selectedTemplateId}
                                                                     >
                                                                         📋
                                                                     </button>

@@ -79,6 +79,7 @@ body {
   flex: 1;
   margin-left: 220px;
   padding: 24px;
+  position: relative;
 }
 
 .card {
@@ -312,6 +313,19 @@ tbody tr:hover {
 .badge-info {
   background: #dbeafe;
   color: #1e40af;
+}
+
+.template-focus-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.35);
+  z-index: 900;
+}
+
+.template-select-highlight {
+  position: relative;
+  z-index: 901;
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.35);
 }
 
 .alert {
