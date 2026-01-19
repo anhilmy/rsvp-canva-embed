@@ -119,10 +119,13 @@ export const websiteApi = {
 
 // Guest API
 export const guestApi = {
-    getByWebsite: (websiteId: string, page = 1, limit = 50, label?: string) => {
+    getByWebsite: (websiteId: string, page = 1, limit = 50, label?: string, search?: string) => {
         let url = `/guests/website/${websiteId}?page=${page}&limit=${limit}`;
         if (label) {
             url += `&label=${encodeURIComponent(label)}`;
+        }
+        if (search) {
+            url += `&search=${encodeURIComponent(search)}`;
         }
         return apiFetch<{ guests: Guest[]; total: number; pages: number; labels: string[] }>(url);
     },
@@ -133,7 +136,7 @@ export const guestApi = {
             method: 'POST',
             body: JSON.stringify({ guests }),
         }),
-    update: (id: string, data: { name?: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string; label?: string }) =>
+    update: (id: string, data: { name?: string; email?: string; phone?: string; greeting?: string; maxAttendees?: number; personalLink?: string; label?: string; invitationStatus?: InvitationStatus; isManual?: boolean }) =>
         apiFetch<Guest>(`/guests/${id}`, { method: 'PUT', body: JSON.stringify(data) }),
     delete: (id: string) =>
         apiFetch<{ message: string }>(`/guests/${id}`, { method: 'DELETE' }),

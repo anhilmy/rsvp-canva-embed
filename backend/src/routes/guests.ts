@@ -9,6 +9,7 @@ import { z } from 'zod';
 // Extended pagination schema with label filter
 const guestPaginationSchema = paginationSchema.extend({
     label: z.string().optional(),
+    search: z.string().optional(),
 });
 
 const router = Router();
@@ -79,8 +80,13 @@ router.get(
     async (req: Request, res: Response, next: NextFunction) => {
         try {
             const { websiteId } = req.params as { websiteId: string };
-            const { page, limit, label } = req.query as unknown as { page: number; limit: number; label?: string };
-            const result = await guestService.findByWebsite(websiteId, page, limit, label);
+            const { page, limit, label, search } = req.query as unknown as {
+                page: number;
+                limit: number;
+                label?: string;
+                search?: string;
+            };
+            const result = await guestService.findByWebsite(websiteId, page, limit, label, search);
             res.json(result);
         } catch (error) {
             next(error);

@@ -30,7 +30,7 @@ function App() {
                 style={{
                     position: 'fixed',
                     bottom: '20px',
-                    right: '20px',
+                    left: '20px',
                     padding: '8px 16px',
                     background: '#ef4444',
                     color: 'white',

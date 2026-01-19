@@ -98,18 +98,22 @@ export class GuestService {
         websiteId: string,
         page: number = 1,
         limit: number = 20,
-        label?: string
+        label?: string,
+        search?: string
     ): Promise<{
         guests: IGuest[];
         total: number;
         pages: number;
         labels: string[];
     }> {
-        const query: { websiteId: Types.ObjectId; label?: string } = {
+        const query: { websiteId: Types.ObjectId; label?: string; name?: { $regex: string; $options: string } } = {
             websiteId: new Types.ObjectId(websiteId),
         };
         if (label) {
             query.label = label;
+        }
+        if (search) {
+            query.name = { $regex: search, $options: 'i' };
         }
 
         const skip = (page - 1) * limit;
@@ -131,7 +135,19 @@ export class GuestService {
     }
 
     async update(id: string, data: UpdateGuestInput): Promise<IGuest | null> {
-        return Guest.findByIdAndUpdate(id, data, { new: true });
+        const updateData: UpdateGuestInput & { invitationSentAt?: Date } = { ...data };
+        const updateOps: { $set: typeof updateData; $unset?: Record<string, number> } = { $set: updateData };
+
+        if (data.invitationStatus === 'invitation_sent') {
+            updateData.invitationSentAt = new Date();
+        }
+
+        if (data.invitationStatus === 'created') {
+            delete updateData.invitationSentAt;
+            updateOps.$unset = { invitationSentAt: 1 };
+        }
+
+        return Guest.findByIdAndUpdate(id, updateOps, { new: true });
     }
 
     async delete(id: string): Promise<boolean> {

@@ -401,6 +401,8 @@ function EditGuestModal({ guest, onClose, onSave }: EditGuestModalProps) {
         maxAttendees: guest.maxAttendees,
         personalLink: guest.personalLink || '',
         label: guest.label || '',
+        invitationStatus: guest.invitationStatus,
+        isManual: guest.isManual,
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
@@ -418,6 +420,8 @@ function EditGuestModal({ guest, onClose, onSave }: EditGuestModalProps) {
                 maxAttendees: form.maxAttendees,
                 personalLink: form.personalLink || undefined,
                 label: form.label || undefined,
+                invitationStatus: form.invitationStatus,
+                isManual: form.isManual,
             });
             onSave();
         } catch (err) {
@@ -495,6 +499,28 @@ function EditGuestModal({ guest, onClose, onSave }: EditGuestModalProps) {
                             />
                         </div>
                         <div className="form-group">
+                            <label className="form-label">Invitation Status</label>
+                            <select
+                                className="form-input"
+                                value={form.invitationStatus}
+                                onChange={(e) => setForm({ ...form, invitationStatus: e.target.value as InvitationStatus })}
+                            >
+                                <option value="created">Created</option>
+                                <option value="invitation_sent">Sent</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
+                            <label className="form-label">Type</label>
+                            <select
+                                className="form-input"
+                                value={form.isManual ? 'walk-in' : 'invited'}
+                                onChange={(e) => setForm({ ...form, isManual: e.target.value === 'walk-in' })}
+                            >
+                                <option value="invited">Invited</option>
+                                <option value="walk-in">Walk-in</option>
+                            </select>
+                        </div>
+                        <div className="form-group">
                             <label className="form-label">Max Attendees</label>
                             <input
                                 className="form-input"
@@ -557,6 +583,12 @@ export default function Dashboard() {
     const [bulkDeleting, setBulkDeleting] = useState(false);
     const [showTemplateFocus, setShowTemplateFocus] = useState(false);
     const templateSelectRef = useRef<HTMLSelectElement>(null);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [debouncedSearch, setDebouncedSearch] = useState('');
+    const [guestPage, setGuestPage] = useState(1);
+    const [guestTotalPages, setGuestTotalPages] = useState(1);
+    const [guestPageInput, setGuestPageInput] = useState('1');
+    const searchInputRef = useRef<HTMLInputElement>(null);
 
     // Load websites
     useEffect(() => {
@@ -574,15 +606,46 @@ export default function Dashboard() {
     // Reload guests when label filter changes
     useEffect(() => {
         if (selectedWebsite && activeTab === 'guests') {
+            setGuestPage(1);
             loadTabData();
         }
     }, [selectedLabelFilter]);
+
+    useEffect(() => {
+        const handle = window.setTimeout(() => {
+            setDebouncedSearch(searchQuery.trim());
+        }, 400);
+
+        return () => window.clearTimeout(handle);
+    }, [searchQuery]);
+
+    useEffect(() => {
+        if (selectedWebsite && activeTab === 'guests') {
+            setGuestPage(1);
+            loadTabData();
+        }
+    }, [debouncedSearch]);
+
+    useEffect(() => {
+        if (selectedWebsite && activeTab === 'guests') {
+            loadTabData();
+        }
+    }, [guestPage]);
+
+    useEffect(() => {
+        setGuestPageInput(String(guestPage));
+    }, [guestPage]);
 
     // Clear selection when website changes
     useEffect(() => {
         setSelectedGuestIds(new Set());
         setSelectedTemplateId('');
         setSelectedLabelFilter('');
+        setSearchQuery('');
+        setDebouncedSearch('');
+        setGuestPage(1);
+        setGuestTotalPages(1);
+        setGuestPageInput('1');
         setSelectedWishIds(new Set());
         setAvailableLabels([]);
     }, [selectedWebsite]);
@@ -606,9 +669,19 @@ export default function Dashboard() {
         setLoading(true);
         try {
             if (activeTab === 'guests') {
-                const data = await guestApi.getByWebsite(selectedWebsite._id, 1, 50, selectedLabelFilter || undefined);
+                const data = await guestApi.getByWebsite(
+                    selectedWebsite._id,
+                    guestPage,
+                    50,
+                    selectedLabelFilter || undefined,
+                    debouncedSearch || undefined
+                );
                 setGuests(data.guests);
                 setAvailableLabels(data.labels || []);
+                setGuestTotalPages(data.pages || 1);
+                if (debouncedSearch) {
+                    window.setTimeout(() => searchInputRef.current?.focus(), 0);
+                }
             } else if (activeTab === 'rsvp') {
                 const data = await rsvpApi.getGuestStatus(selectedWebsite._id);
                 setGuestsWithRSVP(data.guests);
@@ -850,11 +923,22 @@ export default function Dashboard() {
         }
     };
 
+    const handleGuestPageInputCommit = () => {
+        const parsed = Number.parseInt(guestPageInput, 10);
+        if (Number.isNaN(parsed)) {
+            setGuestPageInput(String(guestPage));
+            return;
+        }
+        const clamped = Math.min(Math.max(parsed, 1), guestTotalPages);
+        setGuestPage(clamped);
+    };
+
     // Edit guest handler
     const handleEditGuest = (guest: Guest) => {
         setEditingGuest(guest);
         setShowEditGuestModal(true);
     };
+
 
     return (
         <div className="app">
@@ -943,18 +1027,6 @@ export default function Dashboard() {
                                 Guests
                             </button>
                             <button
-                                className={`btn ${activeTab === 'rsvp' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setActiveTab('rsvp')}
-                            >
-                                RSVPs
-                            </button>
-                            <button
-                                className={`btn ${activeTab === 'wishes' ? 'btn-primary' : 'btn-secondary'}`}
-                                onClick={() => setActiveTab('wishes')}
-                            >
-                                Wishes
-                            </button>
-                            <button
                                 className={`btn ${activeTab === 'broadcast' ? 'btn-primary' : 'btn-secondary'}`}
                                 onClick={() => setActiveTab('broadcast')}
                             >
@@ -971,6 +1043,14 @@ export default function Dashboard() {
                                         <div className="card-header">
                                             <h3 className="card-title">Guests ({guests.length})</h3>
                                             <div className="flex gap-2 items-center">
+                                                <input
+                                                    className="form-input"
+                                                    style={{ width: '220px' }}
+                                                    value={searchQuery}
+                                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                                    placeholder="Search by name..."
+                                                    ref={searchInputRef}
+                                                />
                                                 <select
                                                     className="form-input"
                                                     style={{ width: 'auto', minWidth: '120px' }}
@@ -1017,8 +1097,6 @@ export default function Dashboard() {
                                                         <th>Label</th>
                                                         <th>Greeting</th>
                                                         <th>Status</th>
-                                                        <th>Type</th>
-                                                        <th>Code</th>
                                                         <th>Max</th>
                                                         <th></th>
                                                     </tr>
@@ -1049,12 +1127,6 @@ export default function Dashboard() {
                                                                     {g.invitationStatus === 'invitation_sent' ? 'Sent' : 'Created'}
                                                                 </span>
                                                             </td>
-                                                            <td>
-                                                                <span className={`badge ${g.isManual ? 'badge-warning' : 'badge-success'}`}>
-                                                                    {g.isManual ? 'Walk-in' : 'Invited'}
-                                                                </span>
-                                                            </td>
-                                                            <td><code>{g.uniqueCode}</code></td>
                                                             <td>{g.maxAttendees}</td>
                                                             <td>
                                                                 <div className="flex gap-2">
@@ -1114,6 +1186,43 @@ export default function Dashboard() {
                                                 </button>
                                             </div>
                                         )}
+                                        <div style={{ paddingTop: '12px', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                            <span style={{ fontSize: '12px', color: '#666' }}>
+                                                Page {guestPage} of {guestTotalPages}
+                                            </span>
+                                            <div className="flex gap-2">
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => setGuestPage((p) => Math.max(1, p - 1))}
+                                                    disabled={guestPage <= 1}
+                                                >
+                                                    Previous
+                                                </button>
+                                                <input
+                                                    className="form-input"
+                                                    style={{ width: '70px', textAlign: 'center' }}
+                                                    type="number"
+                                                    min={1}
+                                                    max={guestTotalPages}
+                                                    value={guestPageInput}
+                                                    onChange={(e) => setGuestPageInput(e.target.value)}
+                                                    onBlur={handleGuestPageInputCommit}
+                                                    onKeyDown={(e) => {
+                                                        if (e.key === 'Enter') {
+                                                            handleGuestPageInputCommit();
+                                                            (e.currentTarget as HTMLInputElement).blur();
+                                                        }
+                                                    }}
+                                                />
+                                                <button
+                                                    className="btn btn-secondary btn-sm"
+                                                    onClick={() => setGuestPage((p) => Math.min(guestTotalPages, p + 1))}
+                                                    disabled={guestPage >= guestTotalPages}
+                                                >
+                                                    Next
+                                                </button>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
 

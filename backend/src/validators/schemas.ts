@@ -38,6 +38,8 @@ export const updateGuestSchema = z.object({
     greeting: z.string().max(16, 'Greeting must be 16 characters or less').optional(),
     personalLink: z.string().optional(),
     label: z.string().max(50, 'Label must be 50 characters or less').optional(),
+    invitationStatus: z.enum(['created', 'invitation_sent']).optional(),
+    isManual: z.boolean().optional(),
 });
 
 export const createGuestBulkSchema = z.object({
