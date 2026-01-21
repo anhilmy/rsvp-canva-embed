@@ -589,6 +589,7 @@ export default function Dashboard() {
     const [guestTotalPages, setGuestTotalPages] = useState(1);
     const [guestPageInput, setGuestPageInput] = useState('1');
     const searchInputRef = useRef<HTMLInputElement>(null);
+    const [guestTotalCount, setGuestTotalCount] = useState(0);
 
     // Load websites
     useEffect(() => {
@@ -636,6 +637,12 @@ export default function Dashboard() {
         setGuestPageInput(String(guestPage));
     }, [guestPage]);
 
+    useEffect(() => {
+        if (!loading && activeTab === 'guests' && debouncedSearch) {
+            window.setTimeout(() => searchInputRef.current?.focus(), 0);
+        }
+    }, [loading, activeTab, debouncedSearch]);
+
     // Clear selection when website changes
     useEffect(() => {
         setSelectedGuestIds(new Set());
@@ -646,6 +653,7 @@ export default function Dashboard() {
         setGuestPage(1);
         setGuestTotalPages(1);
         setGuestPageInput('1');
+        setGuestTotalCount(0);
         setSelectedWishIds(new Set());
         setAvailableLabels([]);
     }, [selectedWebsite]);
@@ -679,9 +687,7 @@ export default function Dashboard() {
                 setGuests(data.guests);
                 setAvailableLabels(data.labels || []);
                 setGuestTotalPages(data.pages || 1);
-                if (debouncedSearch) {
-                    window.setTimeout(() => searchInputRef.current?.focus(), 0);
-                }
+                setGuestTotalCount(data.total || 0);
             } else if (activeTab === 'rsvp') {
                 const data = await rsvpApi.getGuestStatus(selectedWebsite._id);
                 setGuestsWithRSVP(data.guests);
@@ -802,9 +808,8 @@ export default function Dashboard() {
     const handleShareGuest = async (guest: Guest) => {
         if (!selectedWebsite) return;
 
-        // Build shareable URL with guest code and name
         const backendUrl = import.meta.env.VITE_API_URL?.replace('/api', '') || 'http://localhost:3001';
-        const shareUrl = `${backendUrl}/api/embed/form/${selectedWebsite.publishId}?code=${guest.uniqueCode}&name=${encodeURIComponent(guest.name)}`;
+        const shareUrl = guest.personalLink || `${backendUrl}/api/embed/form/${selectedWebsite.publishId}?code=${guest.uniqueCode}&name=${encodeURIComponent(guest.name)}`;
 
         try {
             await navigator.clipboard.writeText(shareUrl);
@@ -1041,7 +1046,7 @@ export default function Dashboard() {
                                 {activeTab === 'guests' && (
                                     <div className="card">
                                         <div className="card-header">
-                                            <h3 className="card-title">Guests ({guests.length})</h3>
+                                            <h3 className="card-title">Guests ({guests.length}) • Total: {guestTotalCount}</h3>
                                             <div className="flex gap-2 items-center">
                                                 <input
                                                     className="form-input"
